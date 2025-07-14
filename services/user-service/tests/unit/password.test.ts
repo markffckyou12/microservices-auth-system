@@ -28,13 +28,8 @@ jest.mock('express-validator', () => {
   };
 });
 
-interface TestUser {
-  id: string;
-  email: string;
-  roles: string[];
-}
-
-const TEST_USER: TestUser = {
+// Test constants
+const TEST_USER = {
   id: 'user-1',
   email: 'test@example.com',
   roles: ['user']
@@ -55,9 +50,12 @@ const MOCK_HASHES = {
 };
 
 // Test utilities
-const createMockDb = (): jest.Mocked<Pool> => ({
-  query: jest.fn()
-} as unknown as jest.Mocked<Pool>);
+const createMockDb = () => {
+  const mockQuery = jest.fn();
+  return {
+    query: mockQuery
+  } as unknown as jest.Mocked<Pool>;
+};
 
 const createTestApp = (withAuth = true): express.Application => {
   const app = express();
@@ -81,7 +79,7 @@ const setupBcryptMocks = (hashValue = MOCK_HASHES.new, compareValue = true) => {
 
 describe('Password Routes Integration Tests', () => {
   let app: express.Application;
-  let mockDb: jest.Mocked<Pool>;
+  let mockDb: ReturnType<typeof createMockDb>;
   let passwordService: PasswordServiceImpl;
 
   beforeEach(() => {
@@ -99,7 +97,7 @@ describe('Password Routes Integration Tests', () => {
     describe('Success Cases', () => {
       it('should successfully request password reset for existing user', async () => {
         // Arrange
-        mockDb.query
+        (mockDb.query as jest.Mock)
           .mockResolvedValueOnce({ rows: [{ id: 'user-id' }] })
           .mockResolvedValueOnce({ rowCount: 1 });
 
@@ -116,7 +114,7 @@ describe('Password Routes Integration Tests', () => {
 
       it('should not reveal if user exists (security)', async () => {
         // Arrange
-        mockDb.query.mockResolvedValueOnce({ rows: [] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
         // Act
         const response = await request(app)
@@ -162,7 +160,7 @@ describe('Password Routes Integration Tests', () => {
 
     describe('Database Errors', () => {
       it('should handle database connection errors gracefully', async () => {
-        mockDb.query.mockRejectedValueOnce(new Error('Database connection failed'));
+        (mockDb.query as jest.Mock).mockRejectedValueOnce(new Error('Database connection failed'));
 
         const response = await request(app)
           .post(endpoint)
@@ -190,7 +188,7 @@ describe('Password Routes Integration Tests', () => {
           used: false
         };
 
-        mockDb.query
+        (mockDb.query as jest.Mock)
           .mockResolvedValueOnce({ rows: [validTokenData] })
           .mockResolvedValueOnce({ rowCount: 1 }) // Update password
           .mockResolvedValueOnce({ rowCount: 1 }) // Mark token as used
@@ -244,7 +242,7 @@ describe('Password Routes Integration Tests', () => {
 
     describe('Token Validation', () => {
       it('should return 400 for invalid token', async () => {
-        mockDb.query.mockResolvedValueOnce({ rows: [] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
         const response = await request(app)
           .post(endpoint)
@@ -262,7 +260,7 @@ describe('Password Routes Integration Tests', () => {
           used: false
         };
 
-        mockDb.query.mockResolvedValueOnce({ rows: [expiredTokenData] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [expiredTokenData] });
 
         const response = await request(app)
           .post(endpoint)
@@ -280,7 +278,7 @@ describe('Password Routes Integration Tests', () => {
           used: true
         };
 
-        mockDb.query.mockResolvedValueOnce({ rows: [usedTokenData] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [usedTokenData] });
 
         const response = await request(app)
           .post(endpoint)
@@ -303,7 +301,7 @@ describe('Password Routes Integration Tests', () => {
     describe('Success Cases', () => {
       it('should change password for authenticated user', async () => {
         // Arrange
-        mockDb.query
+        (mockDb.query as jest.Mock)
           .mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] })
           .mockResolvedValueOnce({ rows: [] }) // No password history conflicts
           .mockResolvedValueOnce({ rowCount: 1 }) // Update password
@@ -359,7 +357,7 @@ describe('Password Routes Integration Tests', () => {
 
       it('should return 400 when current password is incorrect', async () => {
         setupBcryptMocks(MOCK_HASHES.new, false);
-        mockDb.query.mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
 
         const response = await request(app)
           .post(endpoint)
@@ -376,7 +374,7 @@ describe('Password Routes Integration Tests', () => {
 
     describe('Password Policy Violations', () => {
       it('should return 400 for weak new password', async () => {
-        mockDb.query.mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
 
         const response = await request(app)
           .post(endpoint)
@@ -390,7 +388,7 @@ describe('Password Routes Integration Tests', () => {
       });
 
       it('should return 400 when new password matches current password', async () => {
-        mockDb.query.mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
 
         const response = await request(app)
           .post(endpoint)
@@ -408,7 +406,7 @@ describe('Password Routes Integration Tests', () => {
 
 describe('Password Service Unit Tests', () => {
   let passwordService: PasswordServiceImpl;
-  let mockDb: jest.Mocked<Pool>;
+  let mockDb: ReturnType<typeof createMockDb>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -457,7 +455,7 @@ describe('Password Service Unit Tests', () => {
   describe('Password History Management', () => {
     it('should detect password reuse', async () => {
       setupBcryptMocks(MOCK_HASHES.new, true);
-      mockDb.query.mockResolvedValueOnce({
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: [
           { password_hash: MOCK_HASHES.old1 },
           { password_hash: MOCK_HASHES.old2 }
@@ -471,7 +469,7 @@ describe('Password Service Unit Tests', () => {
 
     it('should allow new password when not in history', async () => {
       setupBcryptMocks(MOCK_HASHES.new, false);
-      mockDb.query.mockResolvedValueOnce({
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: [
           { password_hash: MOCK_HASHES.old1 },
           { password_hash: MOCK_HASHES.old2 }
@@ -484,7 +482,7 @@ describe('Password Service Unit Tests', () => {
     });
 
     it('should handle empty password history', async () => {
-      mockDb.query.mockResolvedValueOnce({ rows: [] });
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
       const isReused = await passwordService.checkPasswordHistory('user-id', 'FirstPassword123!');
       
@@ -509,7 +507,7 @@ describe('Password Service Unit Tests', () => {
   describe('Password Change Operations', () => {
     describe('Success Cases', () => {
       it('should change password successfully', async () => {
-        mockDb.query
+        (mockDb.query as jest.Mock)
           .mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] })
           .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rowCount: 1 })
@@ -529,7 +527,7 @@ describe('Password Service Unit Tests', () => {
     describe('Failure Cases', () => {
       it('should fail when current password is incorrect', async () => {
         setupBcryptMocks(MOCK_HASHES.new, false);
-        mockDb.query.mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
 
         const result = await passwordService.changePassword(
           TEST_USER.id,
@@ -541,7 +539,7 @@ describe('Password Service Unit Tests', () => {
       });
 
       it('should fail when user is not found', async () => {
-        mockDb.query.mockResolvedValueOnce({ rows: [] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
         const result = await passwordService.changePassword(
           'nonexistent-user',
@@ -553,7 +551,7 @@ describe('Password Service Unit Tests', () => {
       });
 
       it('should fail when new password is weak', async () => {
-        mockDb.query.mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
 
         const result = await passwordService.changePassword(
           TEST_USER.id,
@@ -566,8 +564,8 @@ describe('Password Service Unit Tests', () => {
 
       it('should fail when password is reused', async () => {
         const bcrypt = require('bcryptjs');
-        mockDb.query.mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
-        mockDb.query.mockResolvedValueOnce({ rows: [{ password_hash: MOCK_HASHES.old1 }] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [{ password_hash: MOCK_HASHES.old1 }] });
 
         // Current password check passes, but reused password check fails
         (bcrypt.compare as jest.Mock)
@@ -586,7 +584,7 @@ describe('Password Service Unit Tests', () => {
 
     describe('Database Error Handling', () => {
       it('should handle database errors gracefully', async () => {
-        mockDb.query.mockRejectedValueOnce(new Error('Database error'));
+        (mockDb.query as jest.Mock).mockRejectedValueOnce(new Error('Database error'));
 
         const result = await passwordService.changePassword(
           TEST_USER.id,
@@ -602,7 +600,7 @@ describe('Password Service Unit Tests', () => {
 
 describe('Edge Cases and Error Scenarios', () => {
   let passwordService: PasswordServiceImpl;
-  let mockDb: jest.Mocked<Pool>;
+  let mockDb: ReturnType<typeof createMockDb>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -613,7 +611,7 @@ describe('Edge Cases and Error Scenarios', () => {
 
   describe('Concurrent Operations', () => {
     it('should handle concurrent password changes', async () => {
-      mockDb.query
+      (mockDb.query as jest.Mock)
         .mockResolvedValue({ rows: [{ password: MOCK_HASHES.current }] })
         .mockResolvedValue({ rows: [] })
         .mockResolvedValue({ rowCount: 1 });
@@ -639,7 +637,7 @@ describe('Edge Cases and Error Scenarios', () => {
         password_hash: `$2a$12$hash${i}`
       }));
 
-      mockDb.query.mockResolvedValueOnce({ rows: largeHistory });
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: largeHistory });
 
       const startTime = Date.now();
       const result = await passwordService.checkPasswordHistory('user-id', 'NewPassword123!');

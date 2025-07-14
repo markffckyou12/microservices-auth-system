@@ -10,18 +10,52 @@ jest.mock('bcryptjs', () => ({
   compare: jest.fn().mockResolvedValue(true)
 }));
 
-// Mock express-validator
+// Mock express-validator properly
 jest.mock('express-validator', () => ({
   body: jest.fn(() => ({
     isEmail: jest.fn(() => ({
-      withMessage: jest.fn(() => [])
+      withMessage: jest.fn(() => ({
+        isEmail: jest.fn(() => ({
+          withMessage: jest.fn(() => [])
+        })),
+        notEmpty: jest.fn(() => ({
+          withMessage: jest.fn(() => [])
+        })),
+        isLength: jest.fn(() => ({
+          withMessage: jest.fn(() => [])
+        }))
+      }))
     })),
     notEmpty: jest.fn(() => ({
-      withMessage: jest.fn(() => [])
+      withMessage: jest.fn(() => ({
+        isEmail: jest.fn(() => ({
+          withMessage: jest.fn(() => [])
+        })),
+        notEmpty: jest.fn(() => ({
+          withMessage: jest.fn(() => [])
+        })),
+        isLength: jest.fn(() => ({
+          withMessage: jest.fn(() => [])
+        }))
+      }))
     })),
     isLength: jest.fn(() => ({
-      withMessage: jest.fn(() => [])
+      withMessage: jest.fn(() => ({
+        isEmail: jest.fn(() => ({
+          withMessage: jest.fn(() => [])
+        })),
+        notEmpty: jest.fn(() => ({
+          withMessage: jest.fn(() => [])
+        })),
+        isLength: jest.fn(() => ({
+          withMessage: jest.fn(() => [])
+        }))
+      }))
     }))
+  })),
+  validationResult: jest.fn(() => ({
+    isEmpty: jest.fn(() => true),
+    array: jest.fn(() => [])
   }))
 }));
 
@@ -49,6 +83,13 @@ app.use('/auth/password', createPasswordRouter(new PasswordServiceImpl(mockDb)))
 describe('Password Routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    
+    // Reset express-validator mock to return no errors by default
+    const { validationResult } = require('express-validator');
+    (validationResult as jest.Mock).mockReturnValue({
+      isEmpty: jest.fn(() => true),
+      array: jest.fn(() => [])
+    });
   });
 
   describe('POST /auth/password/reset-request', () => {
@@ -84,6 +125,13 @@ describe('Password Routes', () => {
     });
 
     it('should return 400 if email is missing', async () => {
+      // Mock validation error for missing email
+      const { validationResult } = require('express-validator');
+      (validationResult as jest.Mock).mockReturnValueOnce({
+        isEmpty: jest.fn(() => false),
+        array: jest.fn(() => [{ msg: 'Email is required' }])
+      });
+
       const response = await request(app)
         .post('/auth/password/reset-request')
         .send({});
@@ -120,6 +168,13 @@ describe('Password Routes', () => {
     });
 
     it('should return 400 if token is missing', async () => {
+      // Mock validation error for missing token
+      const { validationResult } = require('express-validator');
+      (validationResult as jest.Mock).mockReturnValueOnce({
+        isEmpty: jest.fn(() => false),
+        array: jest.fn(() => [{ msg: 'Token is required' }])
+      });
+
       const response = await request(app)
         .post('/auth/password/reset')
         .send({ newPassword: 'NewPassword123!' });
@@ -128,6 +183,13 @@ describe('Password Routes', () => {
     });
 
     it('should return 400 if new password is missing', async () => {
+      // Mock validation error for missing password
+      const { validationResult } = require('express-validator');
+      (validationResult as jest.Mock).mockReturnValueOnce({
+        isEmpty: jest.fn(() => false),
+        array: jest.fn(() => [{ msg: 'New password is required' }])
+      });
+
       const response = await request(app)
         .post('/auth/password/reset')
         .send({ token: 'valid-token' });
@@ -162,15 +224,18 @@ describe('Password Routes', () => {
           newPassword: 'NewPassword123!'
         });
 
-      // Add debugging to see what's happening
-      console.log('Response status:', response.status);
-      console.log('Response body:', response.body);
-
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
     });
 
     it('should return 400 if current password is missing', async () => {
+      // Mock validation error for missing current password
+      const { validationResult } = require('express-validator');
+      (validationResult as jest.Mock).mockReturnValueOnce({
+        isEmpty: jest.fn(() => false),
+        array: jest.fn(() => [{ msg: 'Current password is required' }])
+      });
+
       const response = await request(app)
         .post('/auth/password/change')
         .send({ newPassword: 'NewPassword123!' });
@@ -179,6 +244,13 @@ describe('Password Routes', () => {
     });
 
     it('should return 400 if new password is missing', async () => {
+      // Mock validation error for missing new password
+      const { validationResult } = require('express-validator');
+      (validationResult as jest.Mock).mockReturnValueOnce({
+        isEmpty: jest.fn(() => false),
+        array: jest.fn(() => [{ msg: 'New password is required' }])
+      });
+
       const response = await request(app)
         .post('/auth/password/change')
         .send({ currentPassword: 'OldPassword123!' });
@@ -192,6 +264,7 @@ describe('Password Service', () => {
   let passwordService: PasswordServiceImpl;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     passwordService = new PasswordServiceImpl(mockDb);
   });
 
@@ -238,14 +311,17 @@ describe('Password Service', () => {
     consoleSpy.mockRestore();
   });
 
-  // Test password validation specifically
   it('should validate NewPassword123! correctly', () => {
     const validation = passwordService.validatePasswordStrength('NewPassword123!');
     expect(validation.isValid).toBe(true);
   });
 
-  // Test the changePassword method step by step with detailed debugging
   it('should change password successfully', async () => {
+    // Reset bcrypt mock to ensure it returns true for compare
+    const bcrypt = require('bcryptjs');
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+    (bcrypt.hash as jest.Mock).mockResolvedValueOnce('$2a$12$newhash');
+
     // Mock database calls
     (mockDb.query as jest.Mock).mockResolvedValueOnce({
       rows: [{ password: '$2a$12$mockedhash' }]
@@ -258,22 +334,23 @@ describe('Password Service', () => {
     (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
     (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
-    try {
-      console.log('Starting password change test...');
-      console.log('Mock calls before:', (mockDb.query as jest.Mock).mock.calls);
-      
-      const result = await passwordService.changePassword('user-1', 'OldPassword123!', 'NewPassword123!');
-      
-      console.log('Password change result:', result);
-      console.log('Mock calls after:', (mockDb.query as jest.Mock).mock.calls);
-      
-      expect(result).toBe(true);
-    } catch (error) {
-      console.error('Password change error:', error);
-      if (error instanceof Error) {
-        console.error('Error stack:', error.stack);
-      }
-      throw error;
-    }
+    const result = await passwordService.changePassword('user-1', 'OldPassword123!', 'NewPassword123!');
+    
+    expect(result).toBe(true);
+  });
+
+  it('should return false if current password is incorrect', async () => {
+    // Mock bcrypt.compare to return false (incorrect password)
+    const bcrypt = require('bcryptjs');
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+    // Mock database call to get current password
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
+      rows: [{ password: '$2a$12$mockedhash' }]
+    });
+
+    const result = await passwordService.changePassword('user-1', 'WrongPassword123!', 'NewPassword123!');
+    
+    expect(result).toBe(false);
   });
 });

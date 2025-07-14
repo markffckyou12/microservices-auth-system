@@ -12,7 +12,7 @@ jest.mock('bcryptjs', () => ({
 
 // Mock express-validator properly
 jest.mock('express-validator', () => {
-  const createValidationChain = () => ({
+  const createValidationChain = (): any => ({
     isEmail: jest.fn(() => createValidationChain()),
     notEmpty: jest.fn(() => createValidationChain()),
     isLength: jest.fn(() => createValidationChain()),

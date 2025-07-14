@@ -5,7 +5,11 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import { createClient } from 'redis';
+import dotenv from 'dotenv';
 import { setupRoutes } from './routes';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -48,6 +52,17 @@ redis.on('connect', () => {
   console.log('Connected to Redis');
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    service: 'session-service',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || '1.0.0'
+  });
+});
+
 // Setup routes
 setupRoutes(app, redis as any);
 
@@ -75,6 +90,7 @@ const startServer = async () => {
     await redis.connect();
     app.listen(PORT, () => {
       console.log(`Session Service running on port ${PORT}`);
+      console.log(`Health check available at http://localhost:${PORT}/health`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

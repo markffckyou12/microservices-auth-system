@@ -244,7 +244,7 @@ describe('Password Service', () => {
     expect(validation.isValid).toBe(true);
   });
 
-  // Test the changePassword method step by step with debugging
+  // Test the changePassword method step by step with detailed debugging
   it('should change password successfully', async () => {
     // Mock database calls
     (mockDb.query as jest.Mock).mockResolvedValueOnce({
@@ -259,11 +259,18 @@ describe('Password Service', () => {
     (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
     try {
+      console.log('Starting password change test...');
+      console.log('Mock calls before:', (mockDb.query as jest.Mock).mock.calls);
+      
       const result = await passwordService.changePassword('user-1', 'OldPassword123!', 'NewPassword123!');
+      
       console.log('Password change result:', result);
+      console.log('Mock calls after:', (mockDb.query as jest.Mock).mock.calls);
+      
       expect(result).toBe(true);
     } catch (error) {
       console.error('Password change error:', error);
+      console.error('Error stack:', error.stack);
       throw error;
     }
   });

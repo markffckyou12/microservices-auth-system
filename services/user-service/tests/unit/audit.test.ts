@@ -225,6 +225,7 @@ describe('Audit Service', () => {
       expect(result.auditSummary).toEqual(mockAuditSummary);
       expect(result.securitySummary).toEqual(mockSecuritySummary);
       expect(result.userActivity).toEqual(mockUserActivity);
+      expect(result.userActivity).toEqual(mockUserActivity);
     });
   });
 });

@@ -4,6 +4,21 @@ import { Pool } from 'pg';
 import { PasswordServiceImpl } from '../../src/services/password';
 import createPasswordRouter from '../../src/routes/password';
 
+// Mock express-validator
+jest.mock('express-validator', () => ({
+  body: jest.fn(() => ({
+    isEmail: jest.fn(() => ({
+      withMessage: jest.fn(() => [])
+    })),
+    notEmpty: jest.fn(() => ({
+      withMessage: jest.fn(() => [])
+    })),
+    isLength: jest.fn(() => ({
+      withMessage: jest.fn(() => [])
+    }))
+  }))
+}));
+
 // Mock the database with proper typing
 const mockDb = {
   query: jest.fn()

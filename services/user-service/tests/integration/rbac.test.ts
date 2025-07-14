@@ -6,7 +6,7 @@ import { AuditService } from '../../src/services/audit';
 import { AuthorizationMiddleware } from '../../src/middleware/authorization';
 import { Pool } from 'pg';
 
-// Mock services
+// Mock services - don't use jest.Mocked for RBACService due to private db property
 const mockRBACService = {
   createRole: jest.fn(),
   getRoleById: jest.fn(),
@@ -29,9 +29,8 @@ const mockRBACService = {
   getRolePermissions: jest.fn(),
   addPermissionToRole: jest.fn(),
   removePermissionFromRole: jest.fn(),
-  hasPermission: jest.fn(),
-  db: {} as Pool // Add the db property
-} as jest.Mocked<RBACService>;
+  hasPermission: jest.fn()
+} as any;
 
 const mockAuditService: jest.Mocked<AuditService> = {
   logAction: jest.fn(),

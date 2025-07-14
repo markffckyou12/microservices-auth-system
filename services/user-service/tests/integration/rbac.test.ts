@@ -88,8 +88,8 @@ describe('RBAC Routes Integration', () => {
         name: 'admin',
         description: 'Administrator role',
         permissions: ['perm-1', 'perm-2'],
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       mockRBACService.createRole.mockResolvedValue(mockRole);
@@ -119,8 +119,8 @@ describe('RBAC Routes Integration', () => {
           name: 'admin',
           description: 'Administrator role',
           permissions: ['perm-1', 'perm-2'],
-          created_at: new Date(),
-          updated_at: new Date()
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }
       ];
 
@@ -141,8 +141,8 @@ describe('RBAC Routes Integration', () => {
         name: 'admin',
         description: 'Administrator role',
         permissions: ['perm-1', 'perm-2'],
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       mockRBACService.getRoleById.mockResolvedValue(mockRole);

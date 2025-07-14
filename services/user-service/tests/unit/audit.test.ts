@@ -1,3 +1,4 @@
+import { AuditServiceImpl } from '../../src/services/audit';
 import { Pool } from 'pg';
 
 // Mock pg module
@@ -224,7 +225,6 @@ describe('Audit Service', () => {
       expect(result).toBeDefined();
       expect(result.auditSummary).toEqual(mockAuditSummary);
       expect(result.securitySummary).toEqual(mockSecuritySummary);
-      expect(result.userActivity).toEqual(mockUserActivity);
       expect(result.userActivity).toEqual(mockUserActivity);
     });
   });

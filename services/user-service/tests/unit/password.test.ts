@@ -27,6 +27,19 @@ const mockDb = {
 // Create test app
 const app = express();
 app.use(express.json());
+
+// Mock authentication middleware for change password tests
+app.use((req, res, next) => {
+  if (req.path.includes('/change')) {
+    req.user = {
+      id: 'user-1',
+      email: 'test@example.com',
+      roles: ['user']
+    };
+  }
+  next();
+});
+
 app.use('/auth/password', createPasswordRouter(new PasswordServiceImpl(mockDb)));
 
 describe('Password Routes', () => {
@@ -137,7 +150,6 @@ describe('Password Routes', () => {
 
       const response = await request(app)
         .post('/auth/password/change')
-        .set('Authorization', 'Bearer valid-token')
         .send({
           currentPassword: 'OldPassword123!',
           newPassword: 'NewPassword123!'

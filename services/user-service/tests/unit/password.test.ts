@@ -3,6 +3,7 @@ import express from 'express';
 import { Pool } from 'pg';
 import { PasswordServiceImpl } from '../../src/services/password';
 import createPasswordRouter from '../../src/routes/password';
+import bcrypt from 'bcryptjs';
 
 // Mock express-validator
 jest.mock('express-validator', () => ({
@@ -134,9 +135,13 @@ describe('Password Routes', () => {
 
   describe('POST /auth/password/change', () => {
     it('should change password for authenticated user', async () => {
+      // Create a proper hashed password for the test
+      const currentPassword = 'OldPassword123!';
+      const hashedPassword = await bcrypt.hash(currentPassword, 12);
+
       // Mock current password hash
       (mockDb.query as jest.Mock).mockResolvedValueOnce({
-        rows: [{ password: '$2a$12$hashedpassword' }]
+        rows: [{ password: hashedPassword }]
       });
 
       // Mock password history check
@@ -151,7 +156,7 @@ describe('Password Routes', () => {
       const response = await request(app)
         .post('/auth/password/change')
         .send({
-          currentPassword: 'OldPassword123!',
+          currentPassword: currentPassword,
           newPassword: 'NewPassword123!'
         });
 

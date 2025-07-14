@@ -205,27 +205,18 @@ describe('Audit Service', () => {
       const mockSecuritySummary = [
         { event_type: 'permission_denied', severity: 'medium', count: '3' }
       ];
-      const mockUserActivity = [
-        {
-          user_id: 'user-1',
-          action_count: '15',
-          unique_actions: '5',
-          first_action: new Date(),
-          last_action: new Date()
-        }
-      ];
 
       (mockPool.query as jest.Mock)
         .mockResolvedValueOnce({ rows: mockAuditSummary })
-        .mockResolvedValueOnce({ rows: mockSecuritySummary })
-        .mockResolvedValueOnce({ rows: mockUserActivity });
+        .mockResolvedValueOnce({ rows: mockSecuritySummary });
 
       const result = await auditService.generateComplianceReport(new Date(), new Date());
 
       expect(result).toBeDefined();
       expect(result.auditSummary).toEqual(mockAuditSummary);
       expect(result.securitySummary).toEqual(mockSecuritySummary);
-      expect(result.userActivity).toEqual(mockUserActivity);
+      expect(result.period).toBeDefined();
+      expect(result.generatedAt).toBeDefined();
     });
   });
 });

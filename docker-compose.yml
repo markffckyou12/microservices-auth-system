@@ -64,30 +64,6 @@ services:
       - ./services/auth-service:/app
       - /app/node_modules
 
-  # User Service
-  user-service:
-    build:
-      context: .
-      dockerfile: services/user-service/Dockerfile
-    container_name: user-service
-    environment:
-      NODE_ENV: development
-      PORT: 3002
-      DATABASE_URL: postgresql://auth_user:auth_password@postgres:5432/auth_system
-      REDIS_URL: redis://redis:6379
-    ports:
-      - "3002:3002"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - auth-network
-    volumes:
-      - ./services/user-service:/app
-      - /app/node_modules
-
   # Session Service
   session-service:
     build:
@@ -96,11 +72,11 @@ services:
     container_name: session-service
     environment:
       NODE_ENV: development
-      PORT: 3003
+      PORT: 3002
       REDIS_URL: redis://redis:6379
       SESSION_SECRET: your-super-secret-session-key-change-in-production
     ports:
-      - "3003:3003"
+      - "3002:3002"
     depends_on:
       redis:
         condition: service_healthy
@@ -110,28 +86,28 @@ services:
       - ./services/session-service:/app
       - /app/node_modules
 
-  # Frontend (Next.js)
-  frontend:
+  # User Service
+  user-service:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
-    container_name: auth-frontend
+      dockerfile: services/user-service/Dockerfile
+    container_name: user-service
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      NEXT_PUBLIC_AUTH_URL: http://localhost:3001
-      NEXT_PUBLIC_USER_URL: http://localhost:3002
-      NEXT_PUBLIC_SESSION_URL: http://localhost:3003
+      PORT: 3003
+      DATABASE_URL: postgresql://auth_user:auth_password@postgres:5432/auth_system
+      REDIS_URL: redis://redis:6379
     ports:
-      - "3000:3000"
+      - "3003:3003"
     depends_on:
-      - auth-service
-      - user-service
-      - session-service
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - auth-network
     volumes:
-      - ./frontend:/app
+      - ./services/user-service:/app
       - /app/node_modules
 
 volumes:

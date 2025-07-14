@@ -4,10 +4,10 @@ import { Pool } from 'pg';
 import { PasswordServiceImpl } from '../../src/services/password';
 import createPasswordRouter from '../../src/routes/password';
 
-// Mock the database
+// Mock the database with proper Jest typing
 const mockDb = {
   query: jest.fn()
-} as unknown as Pool;
+} as jest.Mocked<Pool>;
 
 // Create test app
 const app = express();
@@ -22,12 +22,12 @@ describe('Password Routes', () => {
   describe('POST /auth/password/reset-request', () => {
     it('should request password reset for existing user', async () => {
       // Mock database response for existing user
-      mockDb.query.mockResolvedValueOnce({
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: [{ id: 'user-id' }]
       });
 
       // Mock successful token generation and email sending
-      mockDb.query.mockResolvedValueOnce({ rowCount: 1 });
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
       const response = await request(app)
         .post('/auth/password/reset-request')
@@ -39,7 +39,7 @@ describe('Password Routes', () => {
 
     it('should not reveal if user exists or not', async () => {
       // Mock database response for non-existing user
-      mockDb.query.mockResolvedValueOnce({
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: []
       });
 
@@ -63,7 +63,7 @@ describe('Password Routes', () => {
   describe('POST /auth/password/reset', () => {
     it('should reset password with valid token', async () => {
       // Mock valid token
-      mockDb.query.mockResolvedValueOnce({
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: [{
           user_id: 'user-id',
           expires_at: new Date(Date.now() + 3600000), // 1 hour from now
@@ -72,9 +72,9 @@ describe('Password Routes', () => {
       });
 
       // Mock password update
-      mockDb.query.mockResolvedValueOnce({ rowCount: 1 });
-      mockDb.query.mockResolvedValueOnce({ rowCount: 1 });
-      mockDb.query.mockResolvedValueOnce({ rowCount: 1 });
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
       const response = await request(app)
         .post('/auth/password/reset')
@@ -107,18 +107,18 @@ describe('Password Routes', () => {
   describe('POST /auth/password/change', () => {
     it('should change password for authenticated user', async () => {
       // Mock current password hash
-      mockDb.query.mockResolvedValueOnce({
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: [{ password: '$2a$12$hashedpassword' }]
       });
 
       // Mock password history check
-      mockDb.query.mockResolvedValueOnce({
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: []
       });
 
       // Mock password update
-      mockDb.query.mockResolvedValueOnce({ rowCount: 1 });
-      mockDb.query.mockResolvedValueOnce({ rowCount: 1 });
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
       const response = await request(app)
         .post('/auth/password/change')
@@ -175,7 +175,7 @@ describe('Password Service', () => {
 
   it('should check password history', async () => {
     // Mock password history
-    mockDb.query.mockResolvedValueOnce({
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
       rows: [
         { password_hash: '$2a$12$oldhash1' },
         { password_hash: '$2a$12$oldhash2' }
@@ -199,4 +199,4 @@ describe('Password Service', () => {
 
     consoleSpy.mockRestore();
   });
-}); 
+});

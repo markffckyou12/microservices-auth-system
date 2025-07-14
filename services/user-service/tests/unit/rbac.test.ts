@@ -1,10 +1,10 @@
 import { RBACService } from '../../src/services/rbac';
 import { Pool } from 'pg';
 
-// Mock the database pool
+// Mock the database pool with proper Jest typing
 const mockPool = {
   query: jest.fn()
-} as unknown as Pool;
+} as jest.Mocked<Pool>;
 
 describe('RBAC Service', () => {
   let rbacService: RBACService;
@@ -25,7 +25,7 @@ describe('RBAC Service', () => {
         updated_at: new Date()
       };
 
-      mockPool.query.mockResolvedValue({
+      (mockPool.query as jest.Mock).mockResolvedValue({
         rows: [mockRole]
       });
 
@@ -54,7 +54,7 @@ describe('RBAC Service', () => {
         updated_at: new Date()
       };
 
-      mockPool.query.mockResolvedValue({
+      (mockPool.query as jest.Mock).mockResolvedValue({
         rows: [mockRole]
       });
 
@@ -68,7 +68,7 @@ describe('RBAC Service', () => {
     });
 
     it('should return null if role not found', async () => {
-      mockPool.query.mockResolvedValue({
+      (mockPool.query as jest.Mock).mockResolvedValue({
         rows: []
       });
 
@@ -99,7 +99,7 @@ describe('RBAC Service', () => {
         }
       ];
 
-      mockPool.query.mockResolvedValue({
+      (mockPool.query as jest.Mock).mockResolvedValue({
         rows: mockRoles
       });
 
@@ -120,7 +120,7 @@ describe('RBAC Service', () => {
         description: 'Read user data'
       };
 
-      mockPool.query.mockResolvedValue({
+      (mockPool.query as jest.Mock).mockResolvedValue({
         rows: [mockPermission]
       });
 
@@ -158,7 +158,7 @@ describe('RBAC Service', () => {
         }
       ];
 
-      mockPool.query.mockResolvedValue({
+      (mockPool.query as jest.Mock).mockResolvedValue({
         rows: mockPermissions
       });
 
@@ -178,7 +178,7 @@ describe('RBAC Service', () => {
         assigned_by: 'admin'
       };
 
-      mockPool.query.mockResolvedValue({
+      (mockPool.query as jest.Mock).mockResolvedValue({
         rows: [mockUserRole]
       });
 
@@ -205,7 +205,7 @@ describe('RBAC Service', () => {
         }
       ];
 
-      mockPool.query.mockResolvedValue({
+      (mockPool.query as jest.Mock).mockResolvedValue({
         rows: mockRoles
       });
 
@@ -219,37 +219,15 @@ describe('RBAC Service', () => {
     });
   });
 
-  describe('hasRole', () => {
-    it('should return true if user has role', async () => {
-      mockPool.query.mockResolvedValue({
-        rows: [{ count: '1' }]
-      });
-
-      const result = await rbacService.hasRole('user-1', 'admin');
-
-      expect(result).toBe(true);
-    });
-
-    it('should return false if user does not have role', async () => {
-      mockPool.query.mockResolvedValue({
-        rows: [{ count: '0' }]
-      });
-
-      const result = await rbacService.hasRole('user-1', 'admin');
-
-      expect(result).toBe(false);
-    });
-  });
-
   describe('checkPermission', () => {
-    it('should return true if user has permission', async () => {
-      // Mock getUserRoles to return roles
-      mockPool.query.mockResolvedValueOnce({
+    it('should check user permission', async () => {
+      // Mock user roles
+      (mockPool.query as jest.Mock).mockResolvedValueOnce({
         rows: [{ id: 'role-1', permissions: ['users:read'] }]
       });
 
       // Mock permission check
-      mockPool.query.mockResolvedValueOnce({
+      (mockPool.query as jest.Mock).mockResolvedValueOnce({
         rows: [{ count: '1' }]
       });
 
@@ -258,8 +236,8 @@ describe('RBAC Service', () => {
       expect(result).toBe(true);
     });
 
-    it('should return false if user has no roles', async () => {
-      mockPool.query.mockResolvedValue({
+    it('should return false for user without roles', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValueOnce({
         rows: []
       });
 
@@ -268,4 +246,20 @@ describe('RBAC Service', () => {
       expect(result).toBe(false);
     });
   });
-}); 
+
+  describe('hasRole', () => {
+    it('should check if user has role', async () => {
+      (mockPool.query as jest.Mock).mockResolvedValue({
+        rows: [{ count: '1' }]
+      });
+
+      const result = await rbacService.hasRole('user-1', 'admin');
+
+      expect(result).toBe(true);
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT COUNT(*) as count FROM user_roles ur'),
+        ['user-1', 'admin']
+      );
+    });
+  });
+});

@@ -5,7 +5,7 @@ import { PasswordServiceImpl } from '../../src/services/password';
 import createPasswordRouter from '../../src/routes/password';
 import bcrypt from 'bcryptjs';
 
-// Mock express-validator
+// Mock express-validator completely
 jest.mock('express-validator', () => ({
   body: jest.fn(() => ({
     isEmail: jest.fn(() => ({
@@ -17,6 +17,10 @@ jest.mock('express-validator', () => ({
     isLength: jest.fn(() => ({
       withMessage: jest.fn(() => [])
     }))
+  })),
+  validationResult: jest.fn(() => ({
+    isEmpty: () => true,
+    array: () => []
   }))
 }));
 

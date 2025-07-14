@@ -137,20 +137,21 @@ describe('Password Routes', () => {
       const currentPassword = 'OldPassword123!';
       const hashedPassword = await bcrypt.hash(currentPassword, 12);
 
-      // Mock current password hash lookup
+      // Mock the database calls in the exact order they happen:
+      // 1. Get current password hash
       (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: [{ password: hashedPassword }]
       });
 
-      // Mock password history check (empty - no reused passwords)
+      // 2. Check password history (empty result - no reused passwords)
       (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: []
       });
 
-      // Mock password update
+      // 3. Update user password
       (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
-      // Mock password history insertion
+      // 4. Insert into password history
       (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
       const response = await request(app)

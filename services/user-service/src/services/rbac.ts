@@ -24,211 +24,160 @@ export interface UserRole {
   assigned_by: string;
 }
 
-export interface RBACService {
-  createRole(role: Omit<Role, 'id' | 'created_at' | 'updated_at'>): Promise<Role>;
-  getRole(roleId: string): Promise<Role | null>;
-  updateRole(roleId: string, updates: Partial<Role>): Promise<Role | null>;
-  deleteRole(roleId: string): Promise<boolean>;
-  listRoles(): Promise<Role[]>;
-  
-  createPermission(permission: Omit<Permission, 'id'>): Promise<Permission>;
-  getPermission(permissionId: string): Promise<Permission | null>;
-  listPermissions(): Promise<Permission[]>;
-  
-  assignRoleToUser(userId: string, roleId: string, assignedBy: string): Promise<UserRole>;
-  revokeRoleFromUser(userId: string, roleId: string): Promise<boolean>;
-  getUserRoles(userId: string): Promise<Role[]>;
-  getUserPermissions(userId: string): Promise<Permission[]>;
-  
-  checkPermission(userId: string, resource: string, action: string): Promise<boolean>;
-  hasRole(userId: string, roleName: string): Promise<boolean>;
+export interface CreateRoleData {
+  name: string;
+  description?: string;
+  permissions?: string[];
 }
 
-export class RBACServiceImpl implements RBACService {
+export interface CreatePermissionData {
+  name: string;
+  resource: string;
+  action: string;
+  description?: string;
+}
+
+export class RBACService {
   constructor(private db: Pool) {}
 
-  async createRole(role: Omit<Role, 'id' | 'created_at' | 'updated_at'>): Promise<Role> {
-    const query = `
-      INSERT INTO roles (name, description, permissions)
-      VALUES ($1, $2, $3)
-      RETURNING *
-    `;
+  async createRole(data: CreateRoleData): Promise<Role> {
+    const { name, description, permissions = [] } = data;
     
-    const result = await this.db.query(query, [
-      role.name,
-      role.description,
-      JSON.stringify(role.permissions)
-    ]);
-    
-    return this.mapRoleFromDb(result.rows[0]);
-  }
-
-  async getRole(roleId: string): Promise<Role | null> {
-    const query = 'SELECT * FROM roles WHERE id = $1';
-    const result = await this.db.query(query, [roleId]);
-    
-    if (result.rows.length === 0) {
-      return null;
-    }
-    
-    return this.mapRoleFromDb(result.rows[0]);
-  }
-
-  async updateRole(roleId: string, updates: Partial<Role>): Promise<Role | null> {
-    const setClause = Object.keys(updates)
-      .filter(key => key !== 'id' && key !== 'created_at')
-      .map((key, index) => `${key} = $${index + 2}`)
-      .join(', ');
-    
-    const query = `
-      UPDATE roles 
-      SET ${setClause}, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1
-      RETURNING *
-    `;
-    
-    const values = [roleId, ...Object.values(updates).filter((_, index) => index !== 0)];
-    const result = await this.db.query(query, values);
-    
-    if (result.rows.length === 0) {
-      return null;
-    }
-    
-    return this.mapRoleFromDb(result.rows[0]);
-  }
-
-  async deleteRole(roleId: string): Promise<boolean> {
-    const query = 'DELETE FROM roles WHERE id = $1';
-    const result = await this.db.query(query, [roleId]);
-    return result.rowCount > 0;
-  }
-
-  async listRoles(): Promise<Role[]> {
-    const query = 'SELECT * FROM roles ORDER BY name';
-    const result = await this.db.query(query);
-    return result.rows.map(row => this.mapRoleFromDb(row));
-  }
-
-  async createPermission(permission: Omit<Permission, 'id'>): Promise<Permission> {
-    const query = `
-      INSERT INTO permissions (name, resource, action, description)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
-    `;
-    
-    const result = await this.db.query(query, [
-      permission.name,
-      permission.resource,
-      permission.action,
-      permission.description
-    ]);
+    const result = await this.db.query(
+      'INSERT INTO roles (name, description, permissions) VALUES ($1, $2, $3) RETURNING *',
+      [name, description, permissions]
+    );
     
     return result.rows[0];
   }
 
-  async getPermission(permissionId: string): Promise<Permission | null> {
-    const query = 'SELECT * FROM permissions WHERE id = $1';
-    const result = await this.db.query(query, [permissionId]);
+  async getRoleById(id: string): Promise<Role | null> {
+    const result = await this.db.query(
+      'SELECT * FROM roles WHERE id = $1',
+      [id]
+    );
     
-    if (result.rows.length === 0) {
-      return null;
-    }
+    return result.rows[0] || null;
+  }
+
+  async getRoleByName(name: string): Promise<Role | null> {
+    const result = await this.db.query(
+      'SELECT * FROM roles WHERE name = $1',
+      [name]
+    );
+    
+    return result.rows[0] || null;
+  }
+
+  async getAllRoles(): Promise<Role[]> {
+    const result = await this.db.query('SELECT * FROM roles ORDER BY name');
+    return result.rows;
+  }
+
+  async updateRole(id: string, data: CreateRoleData): Promise<Role | null> {
+    const { name, description, permissions = [] } = data;
+    
+    const result = await this.db.query(
+      'UPDATE roles SET name = $1, description = $2, permissions = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
+      [name, description, permissions, id]
+    );
+    
+    return result.rows[0] || null;
+  }
+
+  async deleteRole(id: string): Promise<boolean> {
+    const result = await this.db.query(
+      'DELETE FROM roles WHERE id = $1',
+      [id]
+    );
+    
+    return (result.rowCount || 0) > 0;
+  }
+
+  async createPermission(data: CreatePermissionData): Promise<Permission> {
+    const { name, resource, action, description } = data;
+    
+    const result = await this.db.query(
+      'INSERT INTO permissions (name, resource, action, description) VALUES ($1, $2, $3, $4) RETURNING *',
+      [name, resource, action, description]
+    );
     
     return result.rows[0];
   }
 
-  async listPermissions(): Promise<Permission[]> {
-    const query = 'SELECT * FROM permissions ORDER BY resource, action';
-    const result = await this.db.query(query);
+  async getAllPermissions(): Promise<Permission[]> {
+    const result = await this.db.query('SELECT * FROM permissions ORDER BY resource, action');
     return result.rows;
   }
 
   async assignRoleToUser(userId: string, roleId: string, assignedBy: string): Promise<UserRole> {
-    const query = `
-      INSERT INTO user_roles (user_id, role_id, assigned_by)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (user_id, role_id) DO NOTHING
-      RETURNING *
-    `;
-    
-    const result = await this.db.query(query, [userId, roleId, assignedBy]);
-    
-    if (result.rows.length === 0) {
-      // Role already assigned
-      const existingQuery = 'SELECT * FROM user_roles WHERE user_id = $1 AND role_id = $2';
-      const existingResult = await this.db.query(existingQuery, [userId, roleId]);
-      return existingResult.rows[0];
-    }
+    const result = await this.db.query(
+      'INSERT INTO user_roles (user_id, role_id, assigned_by) VALUES ($1, $2, $3) RETURNING *',
+      [userId, roleId, assignedBy]
+    );
     
     return result.rows[0];
   }
 
-  async revokeRoleFromUser(userId: string, roleId: string): Promise<boolean> {
-    const query = 'DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2';
-    const result = await this.db.query(query, [userId, roleId]);
-    return result.rowCount > 0;
-  }
-
   async getUserRoles(userId: string): Promise<Role[]> {
-    const query = `
-      SELECT r.* 
-      FROM roles r
-      JOIN user_roles ur ON r.id = ur.role_id
-      WHERE ur.user_id = $1
-      ORDER BY r.name
-    `;
+    const result = await this.db.query(
+      `SELECT r.* FROM roles r
+       INNER JOIN user_roles ur ON r.id = ur.role_id
+       WHERE ur.user_id = $1
+       ORDER BY r.name`,
+      [userId]
+    );
     
-    const result = await this.db.query(query, [userId]);
-    return result.rows.map(row => this.mapRoleFromDb(row));
-  }
-
-  async getUserPermissions(userId: string): Promise<Permission[]> {
-    const query = `
-      SELECT DISTINCT p.*
-      FROM permissions p
-      JOIN roles r ON p.id = ANY(r.permissions)
-      JOIN user_roles ur ON r.id = ur.role_id
-      WHERE ur.user_id = $1
-      ORDER BY p.resource, p.action
-    `;
-    
-    const result = await this.db.query(query, [userId]);
     return result.rows;
   }
 
-  async checkPermission(userId: string, resource: string, action: string): Promise<boolean> {
-    const query = `
-      SELECT COUNT(*) as count
-      FROM permissions p
-      JOIN roles r ON p.id = ANY(r.permissions)
-      JOIN user_roles ur ON r.id = ur.role_id
-      WHERE ur.user_id = $1 AND p.resource = $2 AND p.action = $3
-    `;
+  async removeRoleFromUser(userId: string, roleId: string): Promise<boolean> {
+    const result = await this.db.query(
+      'DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2',
+      [userId, roleId]
+    );
     
-    const result = await this.db.query(query, [userId, resource, action]);
-    return parseInt(result.rows[0].count) > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async hasRole(userId: string, roleName: string): Promise<boolean> {
-    const query = `
-      SELECT COUNT(*) as count
-      FROM roles r
-      JOIN user_roles ur ON r.id = ur.role_id
-      WHERE ur.user_id = $1 AND r.name = $2
-    `;
+    const result = await this.db.query(
+      `SELECT COUNT(*) as count FROM user_roles ur
+       INNER JOIN roles r ON ur.role_id = r.id
+       WHERE ur.user_id = $1 AND r.name = $2`,
+      [userId, roleName]
+    );
     
-    const result = await this.db.query(query, [userId, roleName]);
     return parseInt(result.rows[0].count) > 0;
   }
 
-  private mapRoleFromDb(row: any): Role {
-    return {
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      permissions: Array.isArray(row.permissions) ? row.permissions : JSON.parse(row.permissions || '[]'),
-      created_at: row.created_at,
-      updated_at: row.updated_at
-    };
+  async checkPermission(userId: string, resource: string, action: string): Promise<boolean> {
+    // First check if user has any roles
+    const userRoles = await this.getUserRoles(userId);
+    if (userRoles.length === 0) {
+      return false;
+    }
+
+    // Check if any of the user's roles have the required permission
+    const result = await this.db.query(
+      `SELECT COUNT(*) as count FROM user_roles ur
+       INNER JOIN roles r ON ur.role_id = r.id
+       WHERE ur.user_id = $1 AND $2 = ANY(r.permissions)`,
+      [userId, `${resource}:${action}`]
+    );
+    
+    return parseInt(result.rows[0].count) > 0;
+  }
+
+  async getRolePermissions(roleId: string): Promise<Permission[]> {
+    const result = await this.db.query(
+      `SELECT p.* FROM permissions p
+       INNER JOIN role_permissions rp ON p.id = rp.permission_id
+       WHERE rp.role_id = $1
+       ORDER BY p.resource, p.action`,
+      [roleId]
+    );
+    
+    return result.rows;
   }
 } 

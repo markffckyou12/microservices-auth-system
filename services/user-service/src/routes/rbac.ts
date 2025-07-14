@@ -1,318 +1,307 @@
 import { Router, Request, Response } from 'express';
-import { body, param, query, validationResult } from 'express-validator';
 import { RBACService } from '../services/rbac';
-import { AuthorizationMiddleware } from '../middleware/authorization';
 import { AuthenticatedRequest } from '../middleware/authorization';
 
-export function createRBACRouter(rbacService: RBACService, authMiddleware: AuthorizationMiddleware) {
+export function setupRBACRoutes(rbacService: RBACService) {
   const router = Router();
 
   // Validation middleware
   const validateRequest = (req: Request, res: Response, next: Function) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: errors.array() 
+    if (!req.body || Object.keys(req.body).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Request body is required'
       });
     }
     next();
   };
 
-  // Role Management Routes
-  router.post('/roles',
-    [
-      body('name').isString().trim().isLength({ min: 1, max: 50 }),
-      body('description').isString().trim().isLength({ min: 1, max: 500 }),
-      body('permissions').isArray().withMessage('Permissions must be an array')
-    ],
-    validateRequest,
-    authMiddleware.requirePermission({ resource: 'roles', action: 'create' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const role = await rbacService.createRole({
-          name: req.body.name,
-          description: req.body.description,
-          permissions: req.body.permissions
+  // Create a new role
+  router.post('/roles', validateRequest, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { name, description, permissions } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({
+          success: false,
+          message: 'Role name is required'
         });
+      }
 
-        res.status(201).json({
-          message: 'Role created successfully',
-          role
+      const role = await rbacService.createRole({
+        name,
+        description,
+        permissions: permissions || []
+      });
+
+      res.status(201).json({
+        success: true,
+        data: role
+      });
+    } catch (error) {
+      console.error('Error creating role:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create role'
+      });
+    }
+  });
+
+  // Get all roles
+  router.get('/roles', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const roles = await rbacService.getAllRoles();
+      
+      res.json({
+        success: true,
+        data: roles
+      });
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch roles'
+      });
+    }
+  });
+
+  // Get role by ID
+  router.get('/roles/:id', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const role = await rbacService.getRoleById(id);
+      
+      if (!role) {
+        return res.status(404).json({
+          success: false,
+          message: 'Role not found'
         });
-      } catch (error) {
-        console.error('Error creating role:', error);
-        res.status(500).json({ error: 'Failed to create role' });
       }
+
+      res.json({
+        success: true,
+        data: role
+      });
+    } catch (error) {
+      console.error('Error fetching role:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch role'
+      });
     }
-  );
+  });
 
-  router.get('/roles',
-    authMiddleware.requirePermission({ resource: 'roles', action: 'read' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const roles = await rbacService.listRoles();
-        res.json({ roles });
-      } catch (error) {
-        console.error('Error listing roles:', error);
-        res.status(500).json({ error: 'Failed to list roles' });
-      }
-    }
-  );
+  // Update role
+  router.put('/roles/:id', validateRequest, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { name, description, permissions } = req.body;
+      
+      const role = await rbacService.updateRole(id, {
+        name,
+        description,
+        permissions: permissions || []
+      });
 
-  router.get('/roles/:roleId',
-    [
-      param('roleId').isUUID().withMessage('Invalid role ID')
-    ],
-    validateRequest,
-    authMiddleware.requirePermission({ resource: 'roles', action: 'read' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const role = await rbacService.getRole(req.params.roleId);
-        
-        if (!role) {
-          return res.status(404).json({ error: 'Role not found' });
-        }
-
-        res.json({ role });
-      } catch (error) {
-        console.error('Error getting role:', error);
-        res.status(500).json({ error: 'Failed to get role' });
-      }
-    }
-  );
-
-  router.put('/roles/:roleId',
-    [
-      param('roleId').isUUID().withMessage('Invalid role ID'),
-      body('name').optional().isString().trim().isLength({ min: 1, max: 50 }),
-      body('description').optional().isString().trim().isLength({ min: 1, max: 500 }),
-      body('permissions').optional().isArray().withMessage('Permissions must be an array')
-    ],
-    validateRequest,
-    authMiddleware.requirePermission({ resource: 'roles', action: 'update' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const role = await rbacService.updateRole(req.params.roleId, req.body);
-        
-        if (!role) {
-          return res.status(404).json({ error: 'Role not found' });
-        }
-
-        res.json({
-          message: 'Role updated successfully',
-          role
+      if (!role) {
+        return res.status(404).json({
+          success: false,
+          message: 'Role not found'
         });
-      } catch (error) {
-        console.error('Error updating role:', error);
-        res.status(500).json({ error: 'Failed to update role' });
       }
+
+      res.json({
+        success: true,
+        data: role
+      });
+    } catch (error) {
+      console.error('Error updating role:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update role'
+      });
     }
-  );
+  });
 
-  router.delete('/roles/:roleId',
-    [
-      param('roleId').isUUID().withMessage('Invalid role ID')
-    ],
-    validateRequest,
-    authMiddleware.requirePermission({ resource: 'roles', action: 'delete' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const deleted = await rbacService.deleteRole(req.params.roleId);
-        
-        if (!deleted) {
-          return res.status(404).json({ error: 'Role not found' });
-        }
-
-        res.json({ message: 'Role deleted successfully' });
-      } catch (error) {
-        console.error('Error deleting role:', error);
-        res.status(500).json({ error: 'Failed to delete role' });
-      }
-    }
-  );
-
-  // Permission Management Routes
-  router.post('/permissions',
-    [
-      body('name').isString().trim().isLength({ min: 1, max: 100 }),
-      body('resource').isString().trim().isLength({ min: 1, max: 50 }),
-      body('action').isString().trim().isLength({ min: 1, max: 50 }),
-      body('description').isString().trim().isLength({ min: 1, max: 500 })
-    ],
-    validateRequest,
-    authMiddleware.requirePermission({ resource: 'permissions', action: 'create' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const permission = await rbacService.createPermission({
-          name: req.body.name,
-          resource: req.body.resource,
-          action: req.body.action,
-          description: req.body.description
+  // Delete role
+  router.delete('/roles/:id', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const deleted = await rbacService.deleteRole(id);
+      
+      if (!deleted) {
+        return res.status(404).json({
+          success: false,
+          message: 'Role not found'
         });
+      }
 
-        res.status(201).json({
-          message: 'Permission created successfully',
-          permission
+      res.json({
+        success: true,
+        message: 'Role deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to delete role'
+      });
+    }
+  });
+
+  // Create a new permission
+  router.post('/permissions', validateRequest, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { name, resource, action, description } = req.body;
+      
+      if (!name || !resource || !action) {
+        return res.status(400).json({
+          success: false,
+          message: 'Permission name, resource, and action are required'
         });
-      } catch (error) {
-        console.error('Error creating permission:', error);
-        res.status(500).json({ error: 'Failed to create permission' });
       }
+
+      const permission = await rbacService.createPermission({
+        name,
+        resource,
+        action,
+        description
+      });
+
+      res.status(201).json({
+        success: true,
+        data: permission
+      });
+    } catch (error) {
+      console.error('Error creating permission:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create permission'
+      });
     }
-  );
+  });
 
-  router.get('/permissions',
-    authMiddleware.requirePermission({ resource: 'permissions', action: 'read' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const permissions = await rbacService.listPermissions();
-        res.json({ permissions });
-      } catch (error) {
-        console.error('Error listing permissions:', error);
-        res.status(500).json({ error: 'Failed to list permissions' });
-      }
+  // Get all permissions
+  router.get('/permissions', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const permissions = await rbacService.getAllPermissions();
+      
+      res.json({
+        success: true,
+        data: permissions
+      });
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch permissions'
+      });
     }
-  );
+  });
 
-  router.get('/permissions/:permissionId',
-    [
-      param('permissionId').isUUID().withMessage('Invalid permission ID')
-    ],
-    validateRequest,
-    authMiddleware.requirePermission({ resource: 'permissions', action: 'read' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const permission = await rbacService.getPermission(req.params.permissionId);
-        
-        if (!permission) {
-          return res.status(404).json({ error: 'Permission not found' });
-        }
-
-        res.json({ permission });
-      } catch (error) {
-        console.error('Error getting permission:', error);
-        res.status(500).json({ error: 'Failed to get permission' });
-      }
+  // Assign role to user
+  router.post('/users/:userId/roles/:roleId', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId, roleId } = req.params;
+      const assignedBy = req.user?.id || 'system';
+      
+      const userRole = await rbacService.assignRoleToUser(userId, roleId, assignedBy);
+      
+      res.status(201).json({
+        success: true,
+        data: userRole
+      });
+    } catch (error) {
+      console.error('Error assigning role to user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to assign role to user'
+      });
     }
-  );
+  });
 
-  // User Role Assignment Routes
-  router.post('/users/:userId/roles',
-    [
-      param('userId').isUUID().withMessage('Invalid user ID'),
-      body('roleId').isUUID().withMessage('Invalid role ID')
-    ],
-    validateRequest,
-    authMiddleware.requirePermission({ resource: 'user_roles', action: 'create' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const userRole = await rbacService.assignRoleToUser(
-          req.params.userId,
-          req.body.roleId,
-          req.user!.id
-        );
+  // Get user roles
+  router.get('/users/:userId/roles', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const roles = await rbacService.getUserRoles(userId);
+      
+      res.json({
+        success: true,
+        data: roles
+      });
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch user roles'
+      });
+    }
+  });
 
-        res.status(201).json({
-          message: 'Role assigned successfully',
-          userRole
+  // Remove role from user
+  router.delete('/users/:userId/roles/:roleId', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId, roleId } = req.params;
+      const removed = await rbacService.removeRoleFromUser(userId, roleId);
+      
+      if (!removed) {
+        return res.status(404).json({
+          success: false,
+          message: 'User role assignment not found'
         });
-      } catch (error) {
-        console.error('Error assigning role:', error);
-        res.status(500).json({ error: 'Failed to assign role' });
       }
+
+      res.json({
+        success: true,
+        message: 'Role removed from user successfully'
+      });
+    } catch (error) {
+      console.error('Error removing role from user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to remove role from user'
+      });
     }
-  );
+  });
 
-  router.delete('/users/:userId/roles/:roleId',
-    [
-      param('userId').isUUID().withMessage('Invalid user ID'),
-      param('roleId').isUUID().withMessage('Invalid role ID')
-    ],
-    validateRequest,
-    authMiddleware.requirePermission({ resource: 'user_roles', action: 'delete' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const revoked = await rbacService.revokeRoleFromUser(
-          req.params.userId,
-          req.params.roleId
-        );
-
-        if (!revoked) {
-          return res.status(404).json({ error: 'User role not found' });
-        }
-
-        res.json({ message: 'Role revoked successfully' });
-      } catch (error) {
-        console.error('Error revoking role:', error);
-        res.status(500).json({ error: 'Failed to revoke role' });
-      }
+  // Check if user has role
+  router.get('/users/:userId/roles/:roleName/check', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId, roleName } = req.params;
+      const hasRole = await rbacService.hasRole(userId, roleName);
+      
+      res.json({
+        success: true,
+        data: { hasRole }
+      });
+    } catch (error) {
+      console.error('Error checking user role:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to check user role'
+      });
     }
-  );
+  });
 
-  router.get('/users/:userId/roles',
-    [
-      param('userId').isUUID().withMessage('Invalid user ID')
-    ],
-    validateRequest,
-    authMiddleware.requireOwnershipOrPermission('user_roles', 'read'),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const roles = await rbacService.getUserRoles(req.params.userId);
-        res.json({ roles });
-      } catch (error) {
-        console.error('Error getting user roles:', error);
-        res.status(500).json({ error: 'Failed to get user roles' });
-      }
+  // Check if user has permission
+  router.get('/users/:userId/permissions/:resource/:action/check', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId, resource, action } = req.params;
+      const hasPermission = await rbacService.checkPermission(userId, resource, action);
+      
+      res.json({
+        success: true,
+        data: { hasPermission }
+      });
+    } catch (error) {
+      console.error('Error checking user permission:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to check user permission'
+      });
     }
-  );
-
-  router.get('/users/:userId/permissions',
-    [
-      param('userId').isUUID().withMessage('Invalid user ID')
-    ],
-    validateRequest,
-    authMiddleware.requireOwnershipOrPermission('user_permissions', 'read'),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const permissions = await rbacService.getUserPermissions(req.params.userId);
-        res.json({ permissions });
-      } catch (error) {
-        console.error('Error getting user permissions:', error);
-        res.status(500).json({ error: 'Failed to get user permissions' });
-      }
-    }
-  );
-
-  // Permission Check Route
-  router.post('/check-permission',
-    [
-      body('userId').isUUID().withMessage('Invalid user ID'),
-      body('resource').isString().trim().isLength({ min: 1 }),
-      body('action').isString().trim().isLength({ min: 1 })
-    ],
-    validateRequest,
-    authMiddleware.requirePermission({ resource: 'permissions', action: 'read' }),
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const hasPermission = await rbacService.checkPermission(
-          req.body.userId,
-          req.body.resource,
-          req.body.action
-        );
-
-        res.json({
-          hasPermission,
-          userId: req.body.userId,
-          resource: req.body.resource,
-          action: req.body.action
-        });
-      } catch (error) {
-        console.error('Error checking permission:', error);
-        res.status(500).json({ error: 'Failed to check permission' });
-      }
-    }
-  );
+  });
 
   return router;
 } 

@@ -1,109 +1,107 @@
 import { Router, Request, Response } from 'express';
-import { Pool } from 'pg';
-import { body } from 'express-validator';
-import PasswordService from '../services/password';
-import { hashPassword, comparePassword } from '../utils/auth';
+import { PasswordService } from '../services/password';
+import { AuthenticatedRequest } from '../middleware/authorization';
 
-// Augment Express Request type for user
-interface AuthenticatedUser {
-  id: string;
-}
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthenticatedUser;
-    }
-  }
-}
-
-export default function createPasswordRoutes(db: Pool) {
+export function setupPasswordRoutes(passwordService: PasswordService) {
   const router = Router();
-  const passwordService = new PasswordService(db);
+
+  // Extend Request interface for password routes
+  interface PasswordRequest extends Request {
+    user?: {
+      id: string;
+      email: string;
+    };
+  }
 
   // Request password reset
-  router.post('/reset-request', [
-    body('email').isEmail().normalizeEmail()
-  ], async (req: Request, res: Response) => {
+  router.post('/reset-request', async (req: PasswordRequest, res: Response) => {
     try {
       const { email } = req.body;
-      const result = await db.query('SELECT id FROM users WHERE email = $1', [email]);
-      if (result.rows.length > 0) {
-        const userId = result.rows[0].id;
-        const token = await passwordService.generatePasswordResetToken(userId);
-        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-        await passwordService.sendPasswordResetEmail(email, resetUrl);
+      
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is required'
+        });
       }
-      return res.json({ success: true, message: 'If an account with this email exists, a password reset link has been sent.' });
+
+      const result = await passwordService.requestPasswordReset(email);
+      
+      res.json({
+        success: true,
+        message: 'If the email exists, a password reset link has been sent'
+      });
     } catch (error) {
       console.error('Error requesting password reset:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      res.status(500).json({
+        success: false,
+        message: 'Failed to request password reset'
+      });
     }
   });
 
   // Reset password with token
-  router.post('/reset', [
-    body('token').notEmpty(),
-    body('newPassword').isLength({ min: 8 })
-  ], async (req: Request, res: Response) => {
+  router.post('/reset', async (req: PasswordRequest, res: Response) => {
     try {
-      const { token, newPassword } = req.body;
-      const userId = await passwordService.verifyPasswordResetToken(token);
-      if (!userId) {
-        return res.status(400).json({ success: false, message: 'Invalid or expired token' });
+      const { token, new_password } = req.body;
+      
+      if (!token || !new_password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Token and new password are required'
+        });
       }
-      const strengthCheck = passwordService.validatePasswordStrength(newPassword);
-      if (!strengthCheck.isStrong) {
-        return res.status(400).json({ success: false, message: 'Password too weak', feedback: strengthCheck.feedback });
-      }
-      const wasUsedRecently = await passwordService.checkPasswordHistory(userId, newPassword);
-      if (wasUsedRecently) {
-        return res.status(400).json({ success: false, message: 'Password was used recently. Please choose a different password.' });
-      }
-      const hashedPassword = await hashPassword(newPassword);
-      await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [hashedPassword, userId]);
-      await passwordService.addToPasswordHistory(userId, hashedPassword);
-      await passwordService.markPasswordResetTokenUsed(token);
-      return res.json({ success: true, message: 'Password reset successfully' });
+
+      const result = await passwordService.resetPassword(token, new_password);
+      
+      res.json({
+        success: true,
+        message: 'Password reset successfully'
+      });
     } catch (error) {
       console.error('Error resetting password:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      res.status(500).json({
+        success: false,
+        message: 'Failed to reset password'
+      });
     }
   });
 
-  // Change password (authenticated user)
-  router.post('/change', [
-    body('currentPassword').notEmpty(),
-    body('newPassword').isLength({ min: 8 })
-  ], async (req: Request, res: Response) => {
+  // Change password for authenticated user
+  router.post('/change', async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      const { current_password, new_password } = req.body;
+      
+      if (!current_password || !new_password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password and new password are required'
+        });
       }
-      const { currentPassword, newPassword } = req.body;
-      const result = await db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
-      if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, message: 'User not found' });
+
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required'
+        });
       }
-      const isValid = await comparePassword(currentPassword, result.rows[0].password_hash);
-      if (!isValid) {
-        return res.status(400).json({ success: false, message: 'Current password is incorrect' });
-      }
-      const strengthCheck = passwordService.validatePasswordStrength(newPassword);
-      if (!strengthCheck.isStrong) {
-        return res.status(400).json({ success: false, message: 'Password too weak', feedback: strengthCheck.feedback });
-      }
-      const wasUsedRecently = await passwordService.checkPasswordHistory(userId, newPassword);
-      if (wasUsedRecently) {
-        return res.status(400).json({ success: false, message: 'Password was used recently. Please choose a different password.' });
-      }
-      const hashedPassword = await hashPassword(newPassword);
-      await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [hashedPassword, userId]);
-      await passwordService.addToPasswordHistory(userId, hashedPassword);
-      return res.json({ success: true, message: 'Password changed successfully' });
+
+      const result = await passwordService.changePassword(
+        req.user.id,
+        current_password,
+        new_password
+      );
+      
+      res.json({
+        success: true,
+        message: 'Password changed successfully'
+      });
     } catch (error) {
       console.error('Error changing password:', error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      res.status(500).json({
+        success: false,
+        message: 'Failed to change password'
+      });
     }
   });
 

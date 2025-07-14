@@ -8,6 +8,10 @@ export interface AuthenticatedRequest extends Request {
     email: string;
     roles?: string[];
   };
+  rateLimit?: {
+    windowMs: number;
+    max: number;
+  };
 }
 
 export interface AuthorizationOptions {

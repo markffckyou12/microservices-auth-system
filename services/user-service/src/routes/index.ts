@@ -17,7 +17,8 @@ export function setupRoutes(db: Pool): Router {
   const passwordService = new PasswordServiceImpl(db);
 
   // Setup routes
-  setupUserRoutes(db, router);
+  const userRouter = setupUserRoutes(db);
+  router.use('/users', userRouter);
   router.use('/rbac', createRBACRouter(rbacService));
   router.use('/audit', createAuditRouter(auditService));
   router.use('/password', createPasswordRouter(passwordService));

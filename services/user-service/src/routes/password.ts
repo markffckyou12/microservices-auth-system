@@ -22,15 +22,16 @@ export default function createPasswordRouter(passwordService: PasswordService): 
   // Request password reset
   router.post('/reset-request', [
     body('email').isEmail().withMessage('Valid email is required')
-  ], async (req: Request, res: Response) => {
+  ], async (req: Request, res: Response): Promise<void> => {
     try {
       const { email } = req.body;
 
       if (!email) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Email is required'
         });
+        return;
       }
 
       const result = await passwordService.requestPasswordReset(email);
@@ -53,22 +54,24 @@ export default function createPasswordRouter(passwordService: PasswordService): 
   router.post('/reset', [
     body('token').notEmpty().withMessage('Token is required'),
     body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-  ], async (req: Request, res: Response) => {
+  ], async (req: Request, res: Response): Promise<void> => {
     try {
       const { token, newPassword } = req.body;
 
       if (!token) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Token is required'
         });
+        return;
       }
 
       if (!newPassword) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'New password is required'
         });
+        return;
       }
 
       const result = await passwordService.resetPassword(token, newPassword);
@@ -97,30 +100,33 @@ export default function createPasswordRouter(passwordService: PasswordService): 
   router.post('/change', [
     body('currentPassword').notEmpty().withMessage('Current password is required'),
     body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-  ], async (req: Request, res: Response) => {
+  ], async (req: Request, res: Response): Promise<void> => {
     try {
       const { currentPassword, newPassword } = req.body;
       const userId = req.user?.id;
 
       if (!userId) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'Authentication required'
         });
+        return;
       }
 
       if (!currentPassword) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Current password is required'
         });
+        return;
       }
 
       if (!newPassword) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'New password is required'
         });
+        return;
       }
 
       const result = await passwordService.changePassword(userId, currentPassword, newPassword);

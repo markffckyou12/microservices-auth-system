@@ -5,42 +5,49 @@ export function createAuditRouter(auditService: AuditService): Router {
   const router = Router();
 
   // Middleware to validate request parameters
-  const validateRequest = (req: Request, res: Response, next: Function) => {
+  const validateRequest = (req: Request, res: Response, next: Function): void => {
     const { user_id, action, resource, start_date, end_date, limit, offset } = req.query;
     
     if (user_id && typeof user_id !== 'string') {
-      return res.status(400).json({ error: 'user_id must be a string' });
+      res.status(400).json({ error: 'user_id must be a string' });
+      return;
     }
     
     if (action && typeof action !== 'string') {
-      return res.status(400).json({ error: 'action must be a string' });
+      res.status(400).json({ error: 'action must be a string' });
+      return;
     }
     
     if (resource && typeof resource !== 'string') {
-      return res.status(400).json({ error: 'resource must be a string' });
+      res.status(400).json({ error: 'resource must be a string' });
+      return;
     }
     
     if (start_date && typeof start_date !== 'string') {
-      return res.status(400).json({ error: 'start_date must be a string' });
+      res.status(400).json({ error: 'start_date must be a string' });
+      return;
     }
     
     if (end_date && typeof end_date !== 'string') {
-      return res.status(400).json({ error: 'end_date must be a string' });
+      res.status(400).json({ error: 'end_date must be a string' });
+      return;
     }
     
     if (limit && (typeof limit !== 'string' || isNaN(parseInt(limit)))) {
-      return res.status(400).json({ error: 'limit must be a valid number' });
+      res.status(400).json({ error: 'limit must be a valid number' });
+      return;
     }
     
     if (offset && (typeof offset !== 'string' || isNaN(parseInt(offset)))) {
-      return res.status(400).json({ error: 'offset must be a valid number' });
+      res.status(400).json({ error: 'offset must be a valid number' });
+      return;
     }
     
     next();
   };
 
   // Get audit logs with filters
-  router.get('/logs', validateRequest, async (req: Request, res: Response) => {
+  router.get('/logs', validateRequest, async (req: Request, res: Response): Promise<void> => {
     try {
       const { user_id, action, resource, start_date, end_date, limit, offset } = req.query;
       
@@ -71,7 +78,7 @@ export function createAuditRouter(auditService: AuditService): Router {
   });
 
   // Get security events with filters
-  router.get('/security-events', validateRequest, async (req: Request, res: Response) => {
+  router.get('/security-events', validateRequest, async (req: Request, res: Response): Promise<void> => {
     try {
       const { event_type, severity, start_date, end_date, limit, offset } = req.query;
       
@@ -101,7 +108,7 @@ export function createAuditRouter(auditService: AuditService): Router {
   });
 
   // Get audit summary
-  router.get('/summary', validateRequest, async (req: Request, res: Response) => {
+  router.get('/summary', validateRequest, async (req: Request, res: Response): Promise<void> => {
     try {
       const { user_id, start_date, end_date } = req.query;
       
@@ -127,7 +134,7 @@ export function createAuditRouter(auditService: AuditService): Router {
   });
 
   // Get security summary
-  router.get('/security-summary', validateRequest, async (req: Request, res: Response) => {
+  router.get('/security-summary', validateRequest, async (req: Request, res: Response): Promise<void> => {
     try {
       const { event_type, severity, start_date, end_date } = req.query;
       
@@ -154,7 +161,7 @@ export function createAuditRouter(auditService: AuditService): Router {
   });
 
   // Get user activity
-  router.get('/user-activity/:userId', async (req: Request, res: Response) => {
+  router.get('/user-activity/:userId', async (req: Request, res: Response): Promise<void> => {
     try {
       const { userId } = req.params;
       
@@ -174,15 +181,16 @@ export function createAuditRouter(auditService: AuditService): Router {
   });
 
   // Generate compliance report
-  router.post('/compliance-report', async (req: Request, res: Response) => {
+  router.post('/compliance-report', async (req: Request, res: Response): Promise<void> => {
     try {
       const { startDate, endDate } = req.body;
       
       if (!startDate || !endDate) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'startDate and endDate are required'
         });
+        return;
       }
 
       const report = await auditService.generateComplianceReport(

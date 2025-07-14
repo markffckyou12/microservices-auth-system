@@ -24,11 +24,11 @@ export interface SecurityEvent {
 }
 
 export interface AuditFilters {
-  user_id?: string;
+  userId?: string;
   action?: string;
   resource?: string;
-  start_date?: string;
-  end_date?: string;
+  startDate?: Date;
+  endDate?: Date;
   limit?: number;
   offset?: number;
 }
@@ -43,15 +43,23 @@ export interface SecurityEventFilters {
 }
 
 export interface AuditSummary {
-  period: {
-    start: Date;
-    end: Date;
-  };
-  audit_summary: any[];
-  security_summary: any[];
-  top_users: any[];
-  total_audit_entries: number;
-  total_security_events: number;
+  action: string;
+  count: string;
+  unique_users: string;
+}
+
+export interface SecuritySummary {
+  event_type: string;
+  severity: string;
+  count: string;
+}
+
+export interface UserActivity {
+  user_id: string;
+  action_count: string;
+  unique_actions: string;
+  first_action: Date;
+  last_action: Date;
 }
 
 export interface AuditService {
@@ -60,32 +68,24 @@ export interface AuditService {
   getAuditLog(userId?: string, action?: string, startDate?: Date, endDate?: Date): Promise<AuditLog[]>;
   logSecurityEvent(event: Omit<SecurityEvent, 'id' | 'created_at'>): Promise<SecurityEvent>;
   getSecurityEvents(filters: SecurityEventFilters): Promise<SecurityEvent[]>;
-  getSecurityEvents(eventType?: string, severity?: string, startDate?: Date, endDate?: Date): Promise<SecurityEvent[]>;
-  getAuditSummary(filters: { start_date?: string; end_date?: string }): Promise<AuditSummary>;
-  generateComplianceReport(startDate: Date, endDate: Date): Promise<Record<string, any>>;
+  getAuditSummary(filters: AuditFilters): Promise<AuditSummary[]>;
+  getSecuritySummary(filters: SecurityEventFilters): Promise<SecuritySummary[]>;
+  getUserActivity(userId: string): Promise<UserActivity[]>;
+  generateComplianceReport(startDate: Date, endDate: Date): Promise<any>;
 }
 
 export class AuditServiceImpl implements AuditService {
   constructor(private db: Pool) {}
 
   async logAction(log: Omit<AuditLog, 'id' | 'created_at'>): Promise<AuditLog> {
-    const query = `
-      INSERT INTO audit_logs (user_id, action, resource, resource_id, details, ip_address, user_agent)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *
-    `;
+    const result = await this.db.query(
+      `INSERT INTO audit_logs (user_id, action, resource, resource_id, details, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [log.user_id, log.action, log.resource, log.resource_id, JSON.stringify(log.details), log.ip_address, log.user_agent]
+    );
     
-    const result = await this.db.query(query, [
-      log.user_id,
-      log.action,
-      log.resource,
-      log.resource_id,
-      JSON.stringify(log.details),
-      log.ip_address,
-      log.user_agent
-    ]);
-    
-    return this.mapAuditLogFromDb(result.rows[0]);
+    return result.rows[0];
   }
 
   async getAuditLogs(filters: AuditFilters): Promise<AuditLog[]> {
@@ -93,238 +93,197 @@ export class AuditServiceImpl implements AuditService {
     const params: any[] = [];
     let paramIndex = 1;
 
-    if (filters.user_id) {
-      query += ` AND user_id = $${paramIndex}`;
-      params.push(filters.user_id);
-      paramIndex++;
+    if (filters.userId) {
+      query += ` AND user_id = $${paramIndex++}`;
+      params.push(filters.userId);
     }
 
     if (filters.action) {
-      query += ` AND action = $${paramIndex}`;
+      query += ` AND action = $${paramIndex++}`;
       params.push(filters.action);
-      paramIndex++;
     }
 
     if (filters.resource) {
-      query += ` AND resource = $${paramIndex}`;
+      query += ` AND resource = $${paramIndex++}`;
       params.push(filters.resource);
-      paramIndex++;
     }
 
-    if (filters.start_date) {
-      query += ` AND created_at >= $${paramIndex}`;
-      params.push(new Date(filters.start_date));
-      paramIndex++;
+    if (filters.startDate) {
+      query += ` AND created_at >= $${paramIndex++}`;
+      params.push(filters.startDate);
     }
 
-    if (filters.end_date) {
-      query += ` AND created_at <= $${paramIndex}`;
-      params.push(new Date(filters.end_date));
-      paramIndex++;
+    if (filters.endDate) {
+      query += ` AND created_at <= $${paramIndex++}`;
+      params.push(filters.endDate);
     }
 
     query += ' ORDER BY created_at DESC';
 
     if (filters.limit) {
-      query += ` LIMIT $${paramIndex}`;
+      query += ` LIMIT $${paramIndex++}`;
       params.push(filters.limit);
-      paramIndex++;
     }
 
     if (filters.offset) {
-      query += ` OFFSET $${paramIndex}`;
+      query += ` OFFSET $${paramIndex++}`;
       params.push(filters.offset);
-      paramIndex++;
     }
 
     const result = await this.db.query(query, params);
-    return result.rows.map(row => this.mapAuditLogFromDb(row));
+    return result.rows;
   }
 
-  // Backward compatibility method
   async getAuditLog(userId?: string, action?: string, startDate?: Date, endDate?: Date): Promise<AuditLog[]> {
-    return this.getAuditLogs({
-      user_id: userId,
-      action: action,
-      start_date: startDate?.toISOString(),
-      end_date: endDate?.toISOString()
-    });
+    return this.getAuditLogs({ userId, action, startDate, endDate });
   }
 
   async logSecurityEvent(event: Omit<SecurityEvent, 'id' | 'created_at'>): Promise<SecurityEvent> {
-    const query = `
-      INSERT INTO security_events (event_type, user_id, details, severity, ip_address, user_agent)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
-    `;
+    const result = await this.db.query(
+      `INSERT INTO security_events (event_type, user_id, details, severity, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [event.event_type, event.user_id, JSON.stringify(event.details), event.severity, event.ip_address, event.user_agent]
+    );
     
-    const result = await this.db.query(query, [
-      event.event_type,
-      event.user_id,
-      JSON.stringify(event.details),
-      event.severity,
-      event.ip_address,
-      event.user_agent
-    ]);
-    
-    return this.mapSecurityEventFromDb(result.rows[0]);
+    return result.rows[0];
   }
 
-  async getSecurityEvents(filters: SecurityEventFilters): Promise<SecurityEvent[]>;
-  async getSecurityEvents(eventType?: string, severity?: string, startDate?: Date, endDate?: Date): Promise<SecurityEvent[]>;
-  async getSecurityEvents(filtersOrEventType?: SecurityEventFilters | string, severity?: string, startDate?: Date, endDate?: Date): Promise<SecurityEvent[]> {
-    // Handle both overloads
-    if (typeof filtersOrEventType === 'string') {
-      // Old signature: getSecurityEvents(eventType?, severity?, startDate?, endDate?)
-      return this.getSecurityEvents({
-        event_type: filtersOrEventType,
-        severity: severity,
-        start_date: startDate?.toISOString(),
-        end_date: endDate?.toISOString()
-      });
-    } else {
-      // New signature: getSecurityEvents(filters)
-      const filters = filtersOrEventType || {};
-      let query = 'SELECT * FROM security_events WHERE 1=1';
-      const params: any[] = [];
-      let paramIndex = 1;
+  async getSecurityEvents(filters: SecurityEventFilters): Promise<SecurityEvent[]> {
+    let query = 'SELECT * FROM security_events WHERE 1=1';
+    const params: any[] = [];
+    let paramIndex = 1;
 
-      if (filters.event_type) {
-        query += ` AND event_type = $${paramIndex}`;
-        params.push(filters.event_type);
-        paramIndex++;
-      }
-
-      if (filters.severity) {
-        query += ` AND severity = $${paramIndex}`;
-        params.push(filters.severity);
-        paramIndex++;
-      }
-
-      if (filters.start_date) {
-        query += ` AND created_at >= $${paramIndex}`;
-        params.push(new Date(filters.start_date));
-        paramIndex++;
-      }
-
-      if (filters.end_date) {
-        query += ` AND created_at <= $${paramIndex}`;
-        params.push(new Date(filters.end_date));
-        paramIndex++;
-      }
-
-      query += ' ORDER BY created_at DESC';
-
-      if (filters.limit) {
-        query += ` LIMIT $${paramIndex}`;
-        params.push(filters.limit);
-        paramIndex++;
-      }
-
-      if (filters.offset) {
-        query += ` OFFSET $${paramIndex}`;
-        params.push(filters.offset);
-        paramIndex++;
-      }
-
-      const result = await this.db.query(query, params);
-      return result.rows.map(row => this.mapSecurityEventFromDb(row));
+    if (filters.event_type) {
+      query += ` AND event_type = $${paramIndex++}`;
+      params.push(filters.event_type);
     }
+
+    if (filters.severity) {
+      query += ` AND severity = $${paramIndex++}`;
+      params.push(filters.severity);
+    }
+
+    if (filters.start_date) {
+      query += ` AND created_at >= $${paramIndex++}`;
+      params.push(filters.start_date);
+    }
+
+    if (filters.end_date) {
+      query += ` AND created_at <= $${paramIndex++}`;
+      params.push(filters.end_date);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    if (filters.limit) {
+      query += ` LIMIT $${paramIndex++}`;
+      params.push(filters.limit);
+    }
+
+    if (filters.offset) {
+      query += ` OFFSET $${paramIndex++}`;
+      params.push(filters.offset);
+    }
+
+    const result = await this.db.query(query, params);
+    return result.rows;
   }
 
-  async getAuditSummary(filters: { start_date?: string; end_date?: string }): Promise<AuditSummary> {
-    const startDate = filters.start_date ? new Date(filters.start_date) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
-    const endDate = filters.end_date ? new Date(filters.end_date) : new Date();
-
-    // Get audit log summary
-    const auditQuery = `
-      SELECT 
-        action,
-        COUNT(*) as count,
-        COUNT(DISTINCT user_id) as unique_users
+  async getAuditSummary(filters: AuditFilters): Promise<AuditSummary[]> {
+    let query = `
+      SELECT action, COUNT(*) as count, COUNT(DISTINCT user_id) as unique_users
       FROM audit_logs 
-      WHERE created_at BETWEEN $1 AND $2
-      GROUP BY action
-      ORDER BY count DESC
+      WHERE 1=1
     `;
-    
-    const auditResult = await this.db.query(auditQuery, [startDate, endDate]);
+    const params: any[] = [];
+    let paramIndex = 1;
 
-    // Get security events summary
-    const securityQuery = `
-      SELECT 
-        event_type,
-        severity,
-        COUNT(*) as count
+    if (filters.userId) {
+      query += ` AND user_id = $${paramIndex++}`;
+      params.push(filters.userId);
+    }
+
+    if (filters.startDate) {
+      query += ` AND created_at >= $${paramIndex++}`;
+      params.push(filters.startDate);
+    }
+
+    if (filters.endDate) {
+      query += ` AND created_at <= $${paramIndex++}`;
+      params.push(filters.endDate);
+    }
+
+    query += ' GROUP BY action ORDER BY count DESC';
+
+    const result = await this.db.query(query, params);
+    return result.rows;
+  }
+
+  async getSecuritySummary(filters: SecurityEventFilters): Promise<SecuritySummary[]> {
+    let query = `
+      SELECT event_type, severity, COUNT(*) as count
       FROM security_events 
-      WHERE created_at BETWEEN $1 AND $2
-      GROUP BY event_type, severity
-      ORDER BY event_type, severity
+      WHERE 1=1
     `;
-    
-    const securityResult = await this.db.query(securityQuery, [startDate, endDate]);
+    const params: any[] = [];
+    let paramIndex = 1;
 
-    // Get user activity summary
-    const userActivityQuery = `
-      SELECT 
+    if (filters.event_type) {
+      query += ` AND event_type = $${paramIndex++}`;
+      params.push(filters.event_type);
+    }
+
+    if (filters.severity) {
+      query += ` AND severity = $${paramIndex++}`;
+      params.push(filters.severity);
+    }
+
+    if (filters.start_date) {
+      query += ` AND created_at >= $${paramIndex++}`;
+      params.push(filters.start_date);
+    }
+
+    if (filters.end_date) {
+      query += ` AND created_at <= $${paramIndex++}`;
+      params.push(filters.end_date);
+    }
+
+    query += ' GROUP BY event_type, severity ORDER BY count DESC';
+
+    const result = await this.db.query(query, params);
+    return result.rows;
+  }
+
+  async getUserActivity(userId: string): Promise<UserActivity[]> {
+    const result = await this.db.query(
+      `SELECT 
         user_id,
         COUNT(*) as action_count,
         COUNT(DISTINCT action) as unique_actions,
         MIN(created_at) as first_action,
         MAX(created_at) as last_action
-      FROM audit_logs 
-      WHERE created_at BETWEEN $1 AND $2
-      GROUP BY user_id
-      ORDER BY action_count DESC
-      LIMIT 10
-    `;
+       FROM audit_logs 
+       WHERE user_id = $1
+       GROUP BY user_id`,
+      [userId]
+    );
     
-    const userActivityResult = await this.db.query(userActivityQuery, [startDate, endDate]);
-
-    return {
-      period: {
-        start: startDate,
-        end: endDate
-      },
-      audit_summary: auditResult.rows,
-      security_summary: securityResult.rows,
-      top_users: userActivityResult.rows,
-      total_audit_entries: auditResult.rows.reduce((sum, row) => sum + parseInt(row.count), 0),
-      total_security_events: securityResult.rows.reduce((sum, row) => sum + parseInt(row.count), 0)
-    };
+    return result.rows;
   }
 
-  async generateComplianceReport(startDate: Date, endDate: Date): Promise<Record<string, any>> {
-    return this.getAuditSummary({
-      start_date: startDate.toISOString(),
-      end_date: endDate.toISOString()
+  async generateComplianceReport(startDate: Date, endDate: Date): Promise<any> {
+    const auditSummary = await this.getAuditSummary({ startDate, endDate });
+    const securitySummary = await this.getSecuritySummary({ 
+      start_date: startDate.toISOString(), 
+      end_date: endDate.toISOString() 
     });
-  }
 
-  private mapAuditLogFromDb(row: any): AuditLog {
     return {
-      id: row.id,
-      user_id: row.user_id,
-      action: row.action,
-      resource: row.resource,
-      resource_id: row.resource_id,
-      details: typeof row.details === 'string' ? JSON.parse(row.details) : row.details,
-      ip_address: row.ip_address,
-      user_agent: row.user_agent,
-      created_at: new Date(row.created_at)
-    };
-  }
-
-  private mapSecurityEventFromDb(row: any): SecurityEvent {
-    return {
-      id: row.id,
-      event_type: row.event_type,
-      user_id: row.user_id,
-      details: typeof row.details === 'string' ? JSON.parse(row.details) : row.details,
-      severity: row.severity,
-      ip_address: row.ip_address,
-      user_agent: row.user_agent,
-      created_at: new Date(row.created_at)
+      period: { startDate, endDate },
+      auditSummary,
+      securitySummary,
+      generatedAt: new Date()
     };
   }
 } 

@@ -115,6 +115,15 @@ export class RBACService {
     return result.rows[0];
   }
 
+  async getPermission(id: string): Promise<Permission | null> {
+    const result = await this.db.query(
+      'SELECT * FROM permissions WHERE id = $1',
+      [id]
+    );
+    
+    return result.rows[0] || null;
+  }
+
   async getAllPermissions(): Promise<Permission[]> {
     const result = await this.db.query('SELECT * FROM permissions ORDER BY resource, action');
     return result.rows;
@@ -200,7 +209,30 @@ export class RBACService {
     
     return result.rows;
   }
-}
 
-// Export for backward compatibility
-export const RBACServiceImpl = RBACService; 
+  async addPermissionToRole(roleId: string, permissionId: string): Promise<boolean> {
+    try {
+      await this.db.query(
+        'INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)',
+        [roleId, permissionId]
+      );
+      return true;
+    } catch (error) {
+      console.error('Error adding permission to role:', error);
+      return false;
+    }
+  }
+
+  async removePermissionFromRole(roleId: string, permissionId: string): Promise<boolean> {
+    const result = await this.db.query(
+      'DELETE FROM role_permissions WHERE role_id = $1 AND permission_id = $2',
+      [roleId, permissionId]
+    );
+    
+    return (result.rowCount || 0) > 0;
+  }
+
+  async hasPermission(userId: string, resource: string, action: string): Promise<boolean> {
+    return this.checkPermission(userId, resource, action);
+  }
+}

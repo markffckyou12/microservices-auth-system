@@ -1,22 +1,26 @@
 import { Router } from 'express';
 import { Pool } from 'pg';
-import { setupUserRoutes } from './user';
-import setupPasswordRoutes from './password';
-import { setupRBACRoutes } from './rbac';
-import { setupAuditRoutes } from './audit';
+import setupUserRoutes from './user';
+import { createRBACRouter } from './rbac';
+import { createAuditRouter } from './audit';
+import { createPasswordRouter } from './password';
 import { RBACService } from '../services/rbac';
-import { AuditServiceImpl } from '../services/audit';
-import { PasswordServiceImpl } from '../services/password';
+import { AuditService } from '../services/audit';
+import { PasswordService } from '../services/password';
 
-export function setupRoutes(app: Router, db: Pool) {
+export function setupRoutes(db: Pool): Router {
+  const router = Router();
+
   // Initialize services
   const rbacService = new RBACService(db);
-  const auditService = new AuditServiceImpl(db);
-  const passwordService = new PasswordServiceImpl(db);
+  const auditService = new AuditService(db);
+  const passwordService = new PasswordService(db);
 
-  // Setup route groups
-  app.use('/auth/password', setupPasswordRoutes(passwordService));
-  app.use('/auth/rbac', setupRBACRoutes(rbacService));
-  app.use('/auth/audit', setupAuditRoutes(auditService));
-  app.use('/auth/users', setupUserRoutes(db));
+  // Setup routes
+  setupUserRoutes(db, router);
+  router.use('/rbac', createRBACRouter(rbacService));
+  router.use('/audit', createAuditRouter(auditService));
+  router.use('/password', createPasswordRouter(passwordService));
+
+  return router;
 } 

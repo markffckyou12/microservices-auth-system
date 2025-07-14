@@ -18,6 +18,7 @@ export interface PasswordService {
   validatePasswordStrength(password: string): { isValid: boolean; errors: string[] };
   checkPasswordHistory(userId: string, newPassword: string): Promise<boolean>;
   sendPasswordResetEmail(email: string, token: string): Promise<void>;
+  generatePasswordResetToken(userId: string): Promise<string>;
 }
 
 export class PasswordServiceImpl implements PasswordService {
@@ -37,7 +38,7 @@ export class PasswordServiceImpl implements PasswordService {
       }
 
       const userId = userResult.rows[0].id;
-      const token = this.generateResetToken();
+      const token = await this.generatePasswordResetToken(userId);
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
       // Store reset token
@@ -219,22 +220,18 @@ export class PasswordServiceImpl implements PasswordService {
   }
 
   async sendPasswordResetEmail(email: string, token: string): Promise<void> {
-    // In a real application, this would send an actual email
+    // In a real implementation, this would send an email
     // For now, we'll just log it
     console.log(`Password reset email sent to ${email} with token: ${token}`);
-    
-    // In production, you would use a service like SendGrid, AWS SES, etc.
-    // await emailService.send({
-    //   to: email,
-    //   subject: 'Password Reset Request',
-    //   html: `Click here to reset your password: ${process.env.FRONTEND_URL}/reset-password?token=${token}`
-    // });
+  }
+
+  async generatePasswordResetToken(userId: string): Promise<string> {
+    // Generate a secure random token
+    const token = crypto.randomBytes(32).toString('hex');
+    return token;
   }
 
   private generateResetToken(): string {
     return crypto.randomBytes(32).toString('hex');
   }
 }
-
-// Export for backward compatibility
-export default PasswordServiceImpl; 

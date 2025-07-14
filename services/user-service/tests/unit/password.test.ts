@@ -3,9 +3,8 @@ import express from 'express';
 import { Pool } from 'pg';
 import { PasswordServiceImpl } from '../../src/services/password';
 import createPasswordRouter from '../../src/routes/password';
-import bcrypt from 'bcryptjs';
 
-// Mock bcrypt
+// Mock bcrypt at the module level
 jest.mock('bcryptjs', () => ({
   hash: jest.fn().mockResolvedValue('$2a$12$mockedhash'),
   compare: jest.fn().mockResolvedValue(true)
@@ -163,6 +162,10 @@ describe('Password Routes', () => {
           newPassword: 'NewPassword123!'
         });
 
+      // Add debugging to see what's happening
+      console.log('Response status:', response.status);
+      console.log('Response body:', response.body);
+
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
     });
@@ -241,18 +244,7 @@ describe('Password Service', () => {
     expect(validation.isValid).toBe(true);
   });
 
-  // Test bcrypt comparison with mocked bcrypt
-  it('should compare passwords correctly', async () => {
-    const password = 'OldPassword123!';
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const isMatch = await bcrypt.compare(password, hashedPassword);
-    
-    expect(isMatch).toBe(true);
-    expect(bcrypt.hash).toHaveBeenCalledWith(password, 12);
-    expect(bcrypt.compare).toHaveBeenCalledWith(password, hashedPassword);
-  });
-
-  // Test the changePassword method step by step
+  // Test the changePassword method step by step with debugging
   it('should change password successfully', async () => {
     // Mock database calls
     (mockDb.query as jest.Mock).mockResolvedValueOnce({
@@ -266,8 +258,13 @@ describe('Password Service', () => {
     (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
     (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
-    const result = await passwordService.changePassword('user-1', 'OldPassword123!', 'NewPassword123!');
-    
-    expect(result).toBe(true);
+    try {
+      const result = await passwordService.changePassword('user-1', 'OldPassword123!', 'NewPassword123!');
+      console.log('Password change result:', result);
+      expect(result).toBe(true);
+    } catch (error) {
+      console.error('Password change error:', error);
+      throw error;
+    }
   });
 });

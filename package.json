@@ -1,0 +1,53 @@
+{
+  "name": "monorepo-auth-system",
+  "version": "1.0.0",
+  "description": "Comprehensive monorepo-based authentication system with multiple services",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:auth\"",
+    "dev:auth": "cd services/auth-service && npm run dev",
+    "build": "npm run build:auth",
+    "build:auth": "cd services/auth-service && npm run build",
+    "test": "npm run test:auth",
+    "test:auth": "cd services/auth-service && npm test",
+    "test:watch": "concurrently \"npm run test:auth:watch\"",
+    "test:auth:watch": "cd services/auth-service && npm run test:watch",
+    "lint": "npm run lint:auth",
+    "lint:auth": "cd services/auth-service && npm run lint",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build",
+    "setup": "npm install && npm run setup:db && npm run setup:redis",
+    "setup:db": "cd services/auth-service && npm run setup:db",
+    "setup:redis": "echo 'Redis setup not implemented yet'"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/monorepo-auth-system.git"
+  },
+  "keywords": [
+    "authentication",
+    "microservices",
+    "monorepo",
+    "jwt",
+    "oauth",
+    "mfa",
+    "security"
+  ],
+  "author": "Your Organization",
+  "license": "MIT"
+} 

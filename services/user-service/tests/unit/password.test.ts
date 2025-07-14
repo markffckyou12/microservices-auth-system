@@ -254,7 +254,10 @@ describe('Password Routes Integration Tests', () => {
 
     describe('Database Errors', () => {
       it('should handle database connection errors gracefully', async () => {
-        (mockDb.query as jest.Mock).mockRejectedValueOnce(new Error('Database connection failed'));
+        // Mock the service method to throw an error
+        jest.spyOn(passwordService, 'requestPasswordReset').mockRejectedValueOnce(
+          new Error('Database connection failed')
+        );
 
         const response = await request(app)
           .post(endpoint)
@@ -663,6 +666,7 @@ describe('Edge Cases and Error Scenarios', () => {
 
   describe('Concurrent Operations', () => {
     it('should handle concurrent password changes', async () => {
+      // Mock successful database operations for concurrent requests
       (mockDb.query as jest.Mock)
         .mockResolvedValue({ rows: [{ password: MOCK_HASHES.current }] })
         .mockResolvedValue({ rows: [] })

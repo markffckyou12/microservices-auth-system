@@ -1,112 +1,149 @@
 import { Router, Request, Response } from 'express';
+import { body } from 'express-validator';
 import { PasswordService } from '../services/password';
-import { AuthenticatedRequest } from '../middleware/authorization';
 
-export function setupPasswordRoutes(passwordService: PasswordService) {
+// Augment Express Request type for user
+interface AuthenticatedUser {
+  id: string;
+  email: string;
+  roles?: string[];
+}
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthenticatedUser;
+    }
+  }
+}
+
+export default function createPasswordRouter(passwordService: PasswordService): Router {
   const router = Router();
 
-  // Extend Request interface for password routes
-  interface PasswordRequest extends Request {
-    user?: {
-      id: string;
-      email: string;
-    };
-  }
-
   // Request password reset
-  router.post('/reset-request', async (req: PasswordRequest, res: Response) => {
+  router.post('/reset-request', [
+    body('email').isEmail().withMessage('Valid email is required')
+  ], async (req: Request, res: Response) => {
     try {
       const { email } = req.body;
-      
+
       if (!email) {
         return res.status(400).json({
           success: false,
-          message: 'Email is required'
+          error: 'Email is required'
         });
       }
 
       const result = await passwordService.requestPasswordReset(email);
       
-      return res.json({
+      // Always return success to prevent email enumeration
+      res.json({
         success: true,
         message: 'If the email exists, a password reset link has been sent'
       });
     } catch (error) {
       console.error('Error requesting password reset:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
-        message: 'Failed to request password reset'
+        error: 'Failed to request password reset'
       });
     }
   });
 
   // Reset password with token
-  router.post('/reset', async (req: PasswordRequest, res: Response) => {
+  router.post('/reset', [
+    body('token').notEmpty().withMessage('Token is required'),
+    body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+  ], async (req: Request, res: Response) => {
     try {
-      const { token, new_password } = req.body;
-      
-      if (!token || !new_password) {
+      const { token, newPassword } = req.body;
+
+      if (!token) {
         return res.status(400).json({
           success: false,
-          message: 'Token and new password are required'
+          error: 'Token is required'
         });
       }
 
-      const result = await passwordService.resetPassword(token, new_password);
+      if (!newPassword) {
+        return res.status(400).json({
+          success: false,
+          error: 'New password is required'
+        });
+      }
+
+      const result = await passwordService.resetPassword(token, newPassword);
       
-      return res.json({
-        success: true,
-        message: 'Password reset successfully'
-      });
+      if (result) {
+        res.json({
+          success: true,
+          message: 'Password reset successfully'
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid or expired token'
+        });
+      }
     } catch (error) {
       console.error('Error resetting password:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
-        message: 'Failed to reset password'
+        error: 'Failed to reset password'
       });
     }
   });
 
-  // Change password for authenticated user
-  router.post('/change', async (req: AuthenticatedRequest, res: Response) => {
+  // Change password (requires authentication)
+  router.post('/change', [
+    body('currentPassword').notEmpty().withMessage('Current password is required'),
+    body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+  ], async (req: Request, res: Response) => {
     try {
-      const { current_password, new_password } = req.body;
-      
-      if (!current_password || !new_password) {
-        return res.status(400).json({
-          success: false,
-          message: 'Current password and new password are required'
-        });
-      }
+      const { currentPassword, newPassword } = req.body;
+      const userId = req.user?.id;
 
-      if (!req.user) {
+      if (!userId) {
         return res.status(401).json({
           success: false,
-          message: 'Authentication required'
+          error: 'Authentication required'
         });
       }
 
-      const result = await passwordService.changePassword(
-        req.user.id,
-        current_password,
-        new_password
-      );
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          error: 'Current password is required'
+        });
+      }
+
+      if (!newPassword) {
+        return res.status(400).json({
+          success: false,
+          error: 'New password is required'
+        });
+      }
+
+      const result = await passwordService.changePassword(userId, currentPassword, newPassword);
       
-      return res.json({
-        success: true,
-        message: 'Password changed successfully'
-      });
+      if (result) {
+        res.json({
+          success: true,
+          message: 'Password changed successfully'
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: 'Current password is incorrect'
+        });
+      }
     } catch (error) {
       console.error('Error changing password:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
-        message: 'Failed to change password'
+        error: 'Failed to change password'
       });
     }
   });
 
   return router;
-}
-
-// Export for backward compatibility
-export default setupPasswordRoutes; 
+} 

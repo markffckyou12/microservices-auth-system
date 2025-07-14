@@ -3,18 +3,18 @@ import { Pool } from 'pg';
 import setupUserRoutes from './user';
 import { createRBACRouter } from './rbac';
 import { createAuditRouter } from './audit';
-import { createPasswordRouter } from './password';
+import createPasswordRouter from './password';
 import { RBACService } from '../services/rbac';
-import { AuditService } from '../services/audit';
-import { PasswordService } from '../services/password';
+import { AuditServiceImpl } from '../services/audit';
+import { PasswordServiceImpl } from '../services/password';
 
 export function setupRoutes(db: Pool): Router {
   const router = Router();
 
   // Initialize services
   const rbacService = new RBACService(db);
-  const auditService = new AuditService(db);
-  const passwordService = new PasswordService(db);
+  const auditService = new AuditServiceImpl(db);
+  const passwordService = new PasswordServiceImpl(db);
 
   // Setup routes
   setupUserRoutes(db, router);

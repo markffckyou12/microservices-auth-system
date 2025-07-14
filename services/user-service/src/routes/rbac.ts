@@ -13,7 +13,7 @@ export function setupRBACRoutes(rbacService: RBACService) {
         message: 'Request body is required'
       });
     }
-    next();
+    return next();
   };
 
   // Create a new role
@@ -34,13 +34,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
         permissions: permissions || []
       });
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: role
       });
     } catch (error) {
       console.error('Error creating role:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to create role'
       });
@@ -52,13 +52,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
     try {
       const roles = await rbacService.getAllRoles();
       
-      res.json({
+      return res.json({
         success: true,
         data: roles
       });
     } catch (error) {
       console.error('Error fetching roles:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to fetch roles'
       });
@@ -78,13 +78,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: role
       });
     } catch (error) {
       console.error('Error fetching role:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to fetch role'
       });
@@ -110,13 +110,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: role
       });
     } catch (error) {
       console.error('Error updating role:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to update role'
       });
@@ -136,13 +136,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Role deleted successfully'
       });
     } catch (error) {
       console.error('Error deleting role:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to delete role'
       });
@@ -168,13 +168,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
         description
       });
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: permission
       });
     } catch (error) {
       console.error('Error creating permission:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to create permission'
       });
@@ -186,13 +186,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
     try {
       const permissions = await rbacService.getAllPermissions();
       
-      res.json({
+      return res.json({
         success: true,
         data: permissions
       });
     } catch (error) {
       console.error('Error fetching permissions:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to fetch permissions'
       });
@@ -207,13 +207,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
       
       const userRole = await rbacService.assignRoleToUser(userId, roleId, assignedBy);
       
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: userRole
       });
     } catch (error) {
       console.error('Error assigning role to user:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to assign role to user'
       });
@@ -226,13 +226,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
       const { userId } = req.params;
       const roles = await rbacService.getUserRoles(userId);
       
-      res.json({
+      return res.json({
         success: true,
         data: roles
       });
     } catch (error) {
       console.error('Error fetching user roles:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to fetch user roles'
       });
@@ -252,13 +252,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Role removed from user successfully'
       });
     } catch (error) {
       console.error('Error removing role from user:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to remove role from user'
       });
@@ -271,13 +271,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
       const { userId, roleName } = req.params;
       const hasRole = await rbacService.hasRole(userId, roleName);
       
-      res.json({
+      return res.json({
         success: true,
         data: { hasRole }
       });
     } catch (error) {
       console.error('Error checking user role:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to check user role'
       });
@@ -290,13 +290,13 @@ export function setupRBACRoutes(rbacService: RBACService) {
       const { userId, resource, action } = req.params;
       const hasPermission = await rbacService.checkPermission(userId, resource, action);
       
-      res.json({
+      return res.json({
         success: true,
         data: { hasPermission }
       });
     } catch (error) {
       console.error('Error checking user permission:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to check user permission'
       });
@@ -304,4 +304,7 @@ export function setupRBACRoutes(rbacService: RBACService) {
   });
 
   return router;
-} 
+}
+
+// Export for backward compatibility
+export const createRBACRouter = setupRBACRoutes; 

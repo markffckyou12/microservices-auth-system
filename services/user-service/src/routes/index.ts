@@ -1,45 +1,22 @@
-import { Express } from 'express';
+import { Router } from 'express';
 import { Pool } from 'pg';
-import createUserRoutes from './user';
-import createPasswordRoutes from './password';
-import { createRBACRouter } from './rbac';
-import { createAuditRouter } from './audit';
-import { RBACServiceImpl } from '../services/rbac';
+import { setupUserRoutes } from './user';
+import setupPasswordRoutes from './password';
+import { setupRBACRoutes } from './rbac';
+import { setupAuditRoutes } from './audit';
+import { RBACService } from '../services/rbac';
 import { AuditServiceImpl } from '../services/audit';
-import { AuthorizationMiddleware } from '../middleware/authorization';
+import { PasswordServiceImpl } from '../services/password';
 
-export const setupRoutes = (app: Express, db: Pool) => {
+export function setupRoutes(app: Router, db: Pool) {
   // Initialize services
-  const rbacService = new RBACServiceImpl(db);
+  const rbacService = new RBACService(db);
   const auditService = new AuditServiceImpl(db);
-  const authMiddleware = new AuthorizationMiddleware(rbacService, auditService);
+  const passwordService = new PasswordServiceImpl(db);
 
-  // Health check route
-  app.get('/health', (req, res) => {
-    res.status(200).json({
-      status: 'healthy',
-      service: 'user-service',
-      timestamp: new Date().toISOString()
-    });
-  });
-
-  // API status route
-  app.get('/api/v1/users/status', (req, res) => {
-    res.status(200).json({
-      message: 'User Service is running',
-      version: '1.0.0'
-    });
-  });
-
-  // User Management Routes
-  app.use('/api/v1/users', createUserRoutes(db));
-
-  // Password Management Routes
-  app.use('/api/v1/password', createPasswordRoutes(db));
-
-  // RBAC Routes (Phase 3)
-  app.use('/api/v1/rbac', createRBACRouter(rbacService, authMiddleware));
-
-  // Audit Routes (Phase 3)
-  app.use('/api/v1/audit', createAuditRouter(auditService, authMiddleware));
-}; 
+  // Setup route groups
+  app.use('/auth/password', setupPasswordRoutes(passwordService));
+  app.use('/auth/rbac', setupRBACRoutes(rbacService));
+  app.use('/auth/audit', setupAuditRoutes(auditService));
+  app.use('/auth/users', setupUserRoutes(db));
+} 

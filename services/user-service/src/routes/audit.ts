@@ -13,7 +13,7 @@ export function setupAuditRoutes(auditService: AuditService) {
         message: 'Request body is required'
       });
     }
-    next();
+    return next();
   };
 
   // Get audit logs with filtering
@@ -31,7 +31,7 @@ export function setupAuditRoutes(auditService: AuditService) {
         offset: parseInt(offset as string)
       });
 
-      res.json({
+      return res.json({
         success: true,
         data: logs,
         pagination: {
@@ -42,7 +42,7 @@ export function setupAuditRoutes(auditService: AuditService) {
       });
     } catch (error) {
       console.error('Error fetching audit logs:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to fetch audit logs'
       });
@@ -63,7 +63,7 @@ export function setupAuditRoutes(auditService: AuditService) {
         offset: parseInt(offset as string)
       });
 
-      res.json({
+      return res.json({
         success: true,
         data: events,
         pagination: {
@@ -74,7 +74,7 @@ export function setupAuditRoutes(auditService: AuditService) {
       });
     } catch (error) {
       console.error('Error fetching security events:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to fetch security events'
       });
@@ -91,13 +91,13 @@ export function setupAuditRoutes(auditService: AuditService) {
         end_date: end_date as string
       });
 
-      res.json({
+      return res.json({
         success: true,
         data: summary
       });
     } catch (error) {
       console.error('Error fetching audit summary:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to fetch audit summary'
       });
@@ -105,4 +105,7 @@ export function setupAuditRoutes(auditService: AuditService) {
   });
 
   return router;
-} 
+}
+
+// Export for backward compatibility
+export const createAuditRouter = setupAuditRoutes; 

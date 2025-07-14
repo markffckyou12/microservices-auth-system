@@ -1,264 +1,237 @@
-import bcrypt from 'bcryptjs';
-import nodemailer from 'nodemailer';
 import { Pool } from 'pg';
-import { signJwt } from '../utils/auth';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export interface PasswordResetToken {
-  userId: string;
+  id: string;
+  user_id: string;
   token: string;
-  expiresAt: Date;
+  expires_at: Date;
   used: boolean;
+  created_at: Date;
 }
 
-export interface PasswordHistory {
-  userId: string;
-  passwordHash: string;
-  createdAt: Date;
+export interface PasswordService {
+  requestPasswordReset(email: string): Promise<boolean>;
+  resetPassword(token: string, newPassword: string): Promise<boolean>;
+  changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean>;
+  validatePasswordStrength(password: string): { isValid: boolean; errors: string[] };
+  checkPasswordHistory(userId: string, newPassword: string): Promise<boolean>;
+  sendPasswordResetEmail(email: string, token: string): Promise<void>;
 }
 
-export interface PasswordStrength {
-  score: number;
-  feedback: string[];
-  isStrong: boolean;
-}
+export class PasswordServiceImpl implements PasswordService {
+  constructor(private db: Pool) {}
 
-export class PasswordService {
-  private db: Pool;
-  private emailTransporter: nodemailer.Transporter;
-
-  constructor(db: Pool) {
-    this.db = db;
-    this.emailTransporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'localhost',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER || '',
-        pass: process.env.SMTP_PASS || ''
-      }
-    });
-  }
-
-  /**
-   * Validate password strength
-   */
-  public validatePasswordStrength(password: string): PasswordStrength {
-    const feedback: string[] = [];
-    let score = 0;
-
-    // Length check
-    if (password.length >= 8) {
-      score += 1;
-    } else {
-      feedback.push('Password must be at least 8 characters long');
-    }
-
-    // Uppercase check
-    if (/[A-Z]/.test(password)) {
-      score += 1;
-    } else {
-      feedback.push('Password must contain at least one uppercase letter');
-    }
-
-    // Lowercase check
-    if (/[a-z]/.test(password)) {
-      score += 1;
-    } else {
-      feedback.push('Password must contain at least one lowercase letter');
-    }
-
-    // Number check
-    if (/\d/.test(password)) {
-      score += 1;
-    } else {
-      feedback.push('Password must contain at least one number');
-    }
-
-    // Special character check
-    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      score += 1;
-    } else {
-      feedback.push('Password must contain at least one special character');
-    }
-
-    return {
-      score,
-      feedback,
-      isStrong: score >= 4
-    };
-  }
-
-  /**
-   * Check if password was used recently
-   */
-  public async checkPasswordHistory(userId: string, password: string): Promise<boolean> {
-    const result = await this.db.query(
-      'SELECT password_hash FROM password_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5',
-      [userId]
-    );
-
-    for (const row of result.rows) {
-      const isMatch = await bcrypt.compare(password, row.password_hash);
-      if (isMatch) {
-        return true; // Password was used recently
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Add password to history
-   */
-  public async addToPasswordHistory(userId: string, passwordHash: string): Promise<void> {
-    await this.db.query(
-      'INSERT INTO password_history (user_id, password_hash, created_at) VALUES ($1, $2, NOW())',
-      [userId, passwordHash]
-    );
-  }
-
-  /**
-   * Generate password reset token
-   */
-  public async generatePasswordResetToken(userId: string): Promise<string> {
-    const token = signJwt({ userId, type: 'password-reset' });
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    await this.db.query(
-      `INSERT INTO password_reset_tokens (user_id, token, expires_at)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (user_id) 
-       DO UPDATE SET token = $2, expires_at = $3`,
-      [userId, token, expiresAt]
-    );
-
-    return token;
-  }
-
-  /**
-   * Verify password reset token
-   */
-  public async verifyPasswordResetToken(token: string): Promise<string | null> {
+  async requestPasswordReset(email: string): Promise<boolean> {
     try {
-      const result = await this.db.query(
-        `SELECT user_id FROM password_reset_tokens 
-         WHERE token = $1 AND expires_at > NOW() AND used = false`,
+      // Check if user exists
+      const userResult = await this.db.query(
+        'SELECT id FROM users WHERE email = $1',
+        [email]
+      );
+
+      if (userResult.rows.length === 0) {
+        // Don't reveal if user exists or not
+        return true;
+      }
+
+      const userId = userResult.rows[0].id;
+      const token = this.generateResetToken();
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      // Store reset token
+      await this.db.query(
+        'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [userId, token, expiresAt]
+      );
+
+      // Send email (in production, this would use a real email service)
+      await this.sendPasswordResetEmail(email, token);
+
+      return true;
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      return false;
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<boolean> {
+    try {
+      // Validate password strength
+      const validation = this.validatePasswordStrength(newPassword);
+      if (!validation.isValid) {
+        throw new Error(`Password validation failed: ${validation.errors.join(', ')}`);
+      }
+
+      // Find valid token
+      const tokenResult = await this.db.query(
+        'SELECT user_id, expires_at, used FROM password_reset_tokens WHERE token = $1',
         [token]
       );
 
-      if (result.rows.length === 0) {
-        return null;
+      if (tokenResult.rows.length === 0) {
+        throw new Error('Invalid reset token');
       }
 
-      return result.rows[0].user_id;
+      const resetToken = tokenResult.rows[0];
+      
+      if (resetToken.used) {
+        throw new Error('Token already used');
+      }
+
+      if (new Date() > new Date(resetToken.expires_at)) {
+        throw new Error('Token expired');
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+      // Update user password
+      await this.db.query(
+        'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
+        [hashedPassword, resetToken.user_id]
+      );
+
+      // Mark token as used
+      await this.db.query(
+        'UPDATE password_reset_tokens SET used = true WHERE token = $1',
+        [token]
+      );
+
+      // Add to password history
+      await this.db.query(
+        'INSERT INTO password_history (user_id, password_hash, created_at) VALUES ($1, $2, NOW())',
+        [resetToken.user_id, hashedPassword]
+      );
+
+      return true;
     } catch (error) {
-      console.error('Error verifying password reset token:', error);
-      return null;
+      console.error('Error resetting password:', error);
+      return false;
     }
   }
 
-  /**
-   * Mark password reset token as used
-   */
-  public async markPasswordResetTokenUsed(token: string): Promise<void> {
-    await this.db.query(
-      'UPDATE password_reset_tokens SET used = true WHERE token = $1',
-      [token]
-    );
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean> {
+    try {
+      // Get current password hash
+      const userResult = await this.db.query(
+        'SELECT password FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (userResult.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      const currentHash = userResult.rows[0].password;
+
+      // Verify current password
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, currentHash);
+      if (!isCurrentPasswordValid) {
+        throw new Error('Current password is incorrect');
+      }
+
+      // Validate new password strength
+      const validation = this.validatePasswordStrength(newPassword);
+      if (!validation.isValid) {
+        throw new Error(`Password validation failed: ${validation.errors.join(', ')}`);
+      }
+
+      // Check password history
+      const isPasswordReused = await this.checkPasswordHistory(userId, newPassword);
+      if (isPasswordReused) {
+        throw new Error('Password has been used recently');
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+      // Update password
+      await this.db.query(
+        'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2',
+        [hashedPassword, userId]
+      );
+
+      // Add to password history
+      await this.db.query(
+        'INSERT INTO password_history (user_id, password_hash, created_at) VALUES ($1, $2, NOW())',
+        [userId, hashedPassword]
+      );
+
+      return true;
+    } catch (error) {
+      console.error('Error changing password:', error);
+      return false;
+    }
   }
 
-  /**
-   * Send password reset email
-   */
-  public async sendPasswordResetEmail(email: string, resetUrl: string): Promise<void> {
-    const mailOptions = {
-      from: process.env.FROM_EMAIL || 'noreply@authsystem.com',
-      to: email,
-      subject: 'Password Reset Request',
-      html: `
-        <h2>Password Reset Request</h2>
-        <p>You have requested to reset your password.</p>
-        <p>Click the link below to reset your password:</p>
-        <a href="${resetUrl}">Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you didn't request this, please ignore this email.</p>
-      `
+  validatePasswordStrength(password: string): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (password.length < 8) {
+      errors.push('Password must be at least 8 characters long');
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      errors.push('Password must contain at least one uppercase letter');
+    }
+
+    if (!/[a-z]/.test(password)) {
+      errors.push('Password must contain at least one lowercase letter');
+    }
+
+    if (!/\d/.test(password)) {
+      errors.push('Password must contain at least one number');
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      errors.push('Password must contain at least one special character');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
     };
-
-    await this.emailTransporter.sendMail(mailOptions);
   }
 
-  /**
-   * Check account lockout status
-   */
-  public async checkAccountLockout(userId: string): Promise<{ isLocked: boolean; remainingTime?: number }> {
-    const result = await this.db.query(
-      'SELECT locked_until FROM users WHERE id = $1',
-      [userId]
-    );
-
-    if (result.rows.length === 0) {
-      return { isLocked: false };
-    }
-
-    const lockedUntil = result.rows[0].locked_until;
-    if (!lockedUntil) {
-      return { isLocked: false };
-    }
-
-    const now = new Date();
-    const lockTime = new Date(lockedUntil);
-
-    if (now < lockTime) {
-      const remainingTime = Math.ceil((lockTime.getTime() - now.getTime()) / 1000);
-      return { isLocked: true, remainingTime };
-    }
-
-    // Unlock account if lock time has passed
-    await this.db.query(
-      'UPDATE users SET locked_until = NULL, failed_attempts = 0 WHERE id = $1',
-      [userId]
-    );
-
-    return { isLocked: false };
-  }
-
-  /**
-   * Increment failed login attempts
-   */
-  public async incrementFailedAttempts(userId: string): Promise<void> {
-    const result = await this.db.query(
-      'SELECT failed_attempts FROM users WHERE id = $1',
-      [userId]
-    );
-
-    const currentAttempts = result.rows[0]?.failed_attempts || 0;
-    const newAttempts = currentAttempts + 1;
-
-    if (newAttempts >= 5) {
-      // Lock account for 30 minutes
-      const lockUntil = new Date(Date.now() + 30 * 60 * 1000);
-      await this.db.query(
-        'UPDATE users SET failed_attempts = $1, locked_until = $2 WHERE id = $3',
-        [newAttempts, lockUntil, userId]
+  async checkPasswordHistory(userId: string, newPassword: string): Promise<boolean> {
+    try {
+      // Get recent password history (last 5 passwords)
+      const historyResult = await this.db.query(
+        'SELECT password_hash FROM password_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT 5',
+        [userId]
       );
-    } else {
-      await this.db.query(
-        'UPDATE users SET failed_attempts = $1 WHERE id = $2',
-        [newAttempts, userId]
-      );
+
+      // Check if new password matches any recent password
+      for (const row of historyResult.rows) {
+        const isMatch = await bcrypt.compare(newPassword, row.password_hash);
+        if (isMatch) {
+          return true; // Password has been used recently
+        }
+      }
+
+      return false; // Password is new
+    } catch (error) {
+      console.error('Error checking password history:', error);
+      return false;
     }
   }
 
-  /**
-   * Reset failed login attempts
-   */
-  public async resetFailedAttempts(userId: string): Promise<void> {
-    await this.db.query(
-      'UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = $1',
-      [userId]
-    );
+  async sendPasswordResetEmail(email: string, token: string): Promise<void> {
+    // In a real application, this would send an actual email
+    // For now, we'll just log it
+    console.log(`Password reset email sent to ${email} with token: ${token}`);
+    
+    // In production, you would use a service like SendGrid, AWS SES, etc.
+    // await emailService.send({
+    //   to: email,
+    //   subject: 'Password Reset Request',
+    //   html: `Click here to reset your password: ${process.env.FRONTEND_URL}/reset-password?token=${token}`
+    // });
   }
-}
 
-export default PasswordService; 
+  private generateResetToken(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+} 

@@ -27,13 +27,13 @@ export function setupPasswordRoutes(passwordService: PasswordService) {
 
       const result = await passwordService.requestPasswordReset(email);
       
-      res.json({
+      return res.json({
         success: true,
         message: 'If the email exists, a password reset link has been sent'
       });
     } catch (error) {
       console.error('Error requesting password reset:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to request password reset'
       });
@@ -54,13 +54,13 @@ export function setupPasswordRoutes(passwordService: PasswordService) {
 
       const result = await passwordService.resetPassword(token, new_password);
       
-      res.json({
+      return res.json({
         success: true,
         message: 'Password reset successfully'
       });
     } catch (error) {
       console.error('Error resetting password:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to reset password'
       });
@@ -92,13 +92,13 @@ export function setupPasswordRoutes(passwordService: PasswordService) {
         new_password
       );
       
-      res.json({
+      return res.json({
         success: true,
         message: 'Password changed successfully'
       });
     } catch (error) {
       console.error('Error changing password:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to change password'
       });
@@ -106,4 +106,7 @@ export function setupPasswordRoutes(passwordService: PasswordService) {
   });
 
   return router;
-} 
+}
+
+// Export for backward compatibility
+export default setupPasswordRoutes; 

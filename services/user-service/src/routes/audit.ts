@@ -1,111 +1,207 @@
 import { Router, Request, Response } from 'express';
-import { AuditService } from '../services/audit';
-import { AuthenticatedRequest } from '../middleware/authorization';
+import { AuditService, AuditFilters, SecurityEventFilters } from '../services/audit';
 
-export function setupAuditRoutes(auditService: AuditService) {
+export function createAuditRouter(auditService: AuditService): Router {
   const router = Router();
 
-  // Validation middleware
+  // Middleware to validate request parameters
   const validateRequest = (req: Request, res: Response, next: Function) => {
-    if (!req.body || Object.keys(req.body).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Request body is required'
-      });
+    const { user_id, action, resource, start_date, end_date, limit, offset } = req.query;
+    
+    if (user_id && typeof user_id !== 'string') {
+      return res.status(400).json({ error: 'user_id must be a string' });
     }
-    return next();
+    
+    if (action && typeof action !== 'string') {
+      return res.status(400).json({ error: 'action must be a string' });
+    }
+    
+    if (resource && typeof resource !== 'string') {
+      return res.status(400).json({ error: 'resource must be a string' });
+    }
+    
+    if (start_date && typeof start_date !== 'string') {
+      return res.status(400).json({ error: 'start_date must be a string' });
+    }
+    
+    if (end_date && typeof end_date !== 'string') {
+      return res.status(400).json({ error: 'end_date must be a string' });
+    }
+    
+    if (limit && (typeof limit !== 'string' || isNaN(parseInt(limit)))) {
+      return res.status(400).json({ error: 'limit must be a valid number' });
+    }
+    
+    if (offset && (typeof offset !== 'string' || isNaN(parseInt(offset)))) {
+      return res.status(400).json({ error: 'offset must be a valid number' });
+    }
+    
+    next();
   };
 
-  // Get audit logs with filtering
-  router.get('/logs', async (req: AuthenticatedRequest, res: Response) => {
+  // Get audit logs with filters
+  router.get('/logs', validateRequest, async (req: Request, res: Response) => {
     try {
-      const { user_id, action, resource, start_date, end_date, limit = 50, offset = 0 } = req.query;
+      const { user_id, action, resource, start_date, end_date, limit, offset } = req.query;
       
-      const logs = await auditService.getAuditLogs({
-        user_id: user_id as string,
+      const filters: AuditFilters = {
+        userId: user_id as string,
         action: action as string,
         resource: resource as string,
-        start_date: start_date as string,
-        end_date: end_date as string,
-        limit: parseInt(limit as string),
-        offset: parseInt(offset as string)
-      });
+        startDate: start_date ? new Date(start_date as string) : undefined,
+        endDate: end_date ? new Date(end_date as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined
+      };
 
-      return res.json({
+      const logs = await auditService.getAuditLogs(filters);
+      
+      res.json({
         success: true,
         data: logs,
-        pagination: {
-          limit: parseInt(limit as string),
-          offset: parseInt(offset as string),
-          total: logs.length
-        }
+        count: logs.length
       });
     } catch (error) {
       console.error('Error fetching audit logs:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
-        message: 'Failed to fetch audit logs'
+        error: 'Failed to fetch audit logs'
       });
     }
   });
 
-  // Get security events
-  router.get('/security-events', async (req: AuthenticatedRequest, res: Response) => {
+  // Get security events with filters
+  router.get('/security-events', validateRequest, async (req: Request, res: Response) => {
     try {
-      const { event_type, severity, start_date, end_date, limit = 50, offset = 0 } = req.query;
+      const { event_type, severity, start_date, end_date, limit, offset } = req.query;
       
-      const events = await auditService.getSecurityEvents({
+      const filters: SecurityEventFilters = {
         event_type: event_type as string,
         severity: severity as string,
         start_date: start_date as string,
         end_date: end_date as string,
-        limit: parseInt(limit as string),
-        offset: parseInt(offset as string)
-      });
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined
+      };
 
-      return res.json({
+      const events = await auditService.getSecurityEvents(filters);
+      
+      res.json({
         success: true,
         data: events,
-        pagination: {
-          limit: parseInt(limit as string),
-          offset: parseInt(offset as string),
-          total: events.length
-        }
+        count: events.length
       });
     } catch (error) {
       console.error('Error fetching security events:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
-        message: 'Failed to fetch security events'
+        error: 'Failed to fetch security events'
       });
     }
   });
 
   // Get audit summary
-  router.get('/summary', async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/summary', validateRequest, async (req: Request, res: Response) => {
     try {
-      const { start_date, end_date } = req.query;
+      const { user_id, start_date, end_date } = req.query;
       
-      const summary = await auditService.getAuditSummary({
-        start_date: start_date as string,
-        end_date: end_date as string
-      });
+      const filters: AuditFilters = {
+        userId: user_id as string,
+        startDate: start_date ? new Date(start_date as string) : undefined,
+        endDate: end_date ? new Date(end_date as string) : undefined
+      };
 
-      return res.json({
+      const summary = await auditService.getAuditSummary(filters);
+      
+      res.json({
         success: true,
         data: summary
       });
     } catch (error) {
       console.error('Error fetching audit summary:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
-        message: 'Failed to fetch audit summary'
+        error: 'Failed to fetch audit summary'
+      });
+    }
+  });
+
+  // Get security summary
+  router.get('/security-summary', validateRequest, async (req: Request, res: Response) => {
+    try {
+      const { event_type, severity, start_date, end_date } = req.query;
+      
+      const filters: SecurityEventFilters = {
+        event_type: event_type as string,
+        severity: severity as string,
+        start_date: start_date as string,
+        end_date: end_date as string
+      };
+
+      const summary = await auditService.getSecuritySummary(filters);
+      
+      res.json({
+        success: true,
+        data: summary
+      });
+    } catch (error) {
+      console.error('Error fetching security summary:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch security summary'
+      });
+    }
+  });
+
+  // Get user activity
+  router.get('/user-activity/:userId', async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.params;
+      
+      const activity = await auditService.getUserActivity(userId);
+      
+      res.json({
+        success: true,
+        data: activity
+      });
+    } catch (error) {
+      console.error('Error fetching user activity:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch user activity'
+      });
+    }
+  });
+
+  // Generate compliance report
+  router.post('/compliance-report', async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate } = req.body;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          error: 'startDate and endDate are required'
+        });
+      }
+
+      const report = await auditService.generateComplianceReport(
+        new Date(startDate),
+        new Date(endDate)
+      );
+      
+      res.json({
+        success: true,
+        data: report
+      });
+    } catch (error) {
+      console.error('Error generating compliance report:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate compliance report'
       });
     }
   });
 
   return router;
-}
-
-// Export for backward compatibility
-export const createAuditRouter = setupAuditRoutes; 
+} 

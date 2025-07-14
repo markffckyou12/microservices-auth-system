@@ -270,7 +270,9 @@ describe('Password Service', () => {
       expect(result).toBe(true);
     } catch (error) {
       console.error('Password change error:', error);
-      console.error('Error stack:', error.stack);
+      if (error instanceof Error) {
+        console.error('Error stack:', error.stack);
+      }
       throw error;
     }
   });

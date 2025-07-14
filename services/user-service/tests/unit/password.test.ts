@@ -68,7 +68,11 @@ const createTestPasswordRouter = (passwordService: PasswordServiceImpl) => {
 
     try {
       const result = await passwordService.requestPasswordReset(email);
-      return res.status(200).json({ success: true, message: 'Password reset requested' });
+      if (result) {
+        return res.status(200).json({ success: true, message: 'Password reset requested' });
+      } else {
+        return res.status(500).json({ error: 'Internal server error' });
+      }
     } catch (error) {
       return res.status(500).json({ error: 'Internal server error' });
     }

@@ -11,19 +11,18 @@ jest.mock('bcryptjs', () => ({
 }));
 
 // Mock express-validator properly
-jest.mock('express-validator', () => ({
-  body: jest.fn(() => ({
-    isEmail: jest.fn(() => ({
-      withMessage: jest.fn(() => [])
-    })),
-    notEmpty: jest.fn(() => ({
-      withMessage: jest.fn(() => [])
-    })),
-    isLength: jest.fn(() => ({
-      withMessage: jest.fn(() => [])
-    }))
-  }))
-}));
+jest.mock('express-validator', () => {
+  const createValidationChain = () => ({
+    isEmail: jest.fn(() => createValidationChain()),
+    notEmpty: jest.fn(() => createValidationChain()),
+    isLength: jest.fn(() => createValidationChain()),
+    withMessage: jest.fn(() => [])
+  });
+
+  return {
+    body: jest.fn(() => createValidationChain())
+  };
+});
 
 // Mock the database with proper typing
 const mockDb = {

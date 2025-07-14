@@ -68,9 +68,9 @@ const createTestPasswordRouter = (passwordService: PasswordServiceImpl) => {
 
     try {
       const result = await passwordService.requestPasswordReset(email);
-      res.status(200).json({ success: true, message: 'Password reset requested' });
+      return res.status(200).json({ success: true, message: 'Password reset requested' });
     } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -89,12 +89,12 @@ const createTestPasswordRouter = (passwordService: PasswordServiceImpl) => {
     try {
       const result = await passwordService.resetPassword(token, newPassword);
       if (result) {
-        res.status(200).json({ success: true, message: 'Password reset successfully' });
+        return res.status(200).json({ success: true, message: 'Password reset successfully' });
       } else {
-        res.status(400).json({ error: 'Invalid or expired token' });
+        return res.status(400).json({ error: 'Invalid or expired token' });
       }
     } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -117,12 +117,12 @@ const createTestPasswordRouter = (passwordService: PasswordServiceImpl) => {
     try {
       const result = await passwordService.changePassword(req.user.id, currentPassword, newPassword);
       if (result) {
-        res.status(200).json({ success: true, message: 'Password changed successfully' });
+        return res.status(200).json({ success: true, message: 'Password changed successfully' });
       } else {
-        res.status(400).json({ error: 'Password change failed' });
+        return res.status(400).json({ error: 'Password change failed' });
       }
     } catch (error) {
-      res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -149,7 +149,7 @@ describe('Password Routes Integration Tests', () => {
     describe('Success Cases', () => {
       it('should successfully request password reset for existing user', async () => {
         // Arrange
-        mockDb.query
+        (mockDb.query as jest.Mock)
           .mockResolvedValueOnce({ rows: [{ id: 'user-id' }] })
           .mockResolvedValueOnce({ rowCount: 1 });
 
@@ -166,7 +166,7 @@ describe('Password Routes Integration Tests', () => {
 
       it('should not reveal if user exists (security)', async () => {
         // Arrange
-        mockDb.query.mockResolvedValueOnce({ rows: [] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
         // Act
         const response = await request(app)
@@ -195,7 +195,7 @@ describe('Password Routes Integration Tests', () => {
     describe('Database Errors', () => {
       it('should handle database connection errors gracefully', async () => {
         // Arrange
-        mockDb.query.mockRejectedValueOnce(new Error('Database connection failed'));
+        (mockDb.query as jest.Mock).mockRejectedValueOnce(new Error('Database connection failed'));
 
         // Act
         const response = await request(app)
@@ -221,7 +221,7 @@ describe('Password Routes Integration Tests', () => {
           used: false
         };
 
-        mockDb.query
+        (mockDb.query as jest.Mock)
           .mockResolvedValueOnce({ rows: [validTokenData] })
           .mockResolvedValueOnce({ rowCount: 1 }) // Update password
           .mockResolvedValueOnce({ rowCount: 1 }) // Mark token as used
@@ -269,7 +269,7 @@ describe('Password Routes Integration Tests', () => {
     describe('Token Validation', () => {
       it('should return 400 for invalid token', async () => {
         // Arrange
-        mockDb.query.mockResolvedValueOnce({ rows: [] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
         // Act
         const response = await request(app)
@@ -292,7 +292,7 @@ describe('Password Routes Integration Tests', () => {
           used: false
         };
 
-        mockDb.query.mockResolvedValueOnce({ rows: [expiredTokenData] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [expiredTokenData] });
 
         // Act
         const response = await request(app)
@@ -315,7 +315,7 @@ describe('Password Routes Integration Tests', () => {
           used: true
         };
 
-        mockDb.query.mockResolvedValueOnce({ rows: [usedTokenData] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [usedTokenData] });
 
         // Act
         const response = await request(app)
@@ -338,7 +338,7 @@ describe('Password Routes Integration Tests', () => {
     describe('Success Cases', () => {
       it('should change password for authenticated user', async () => {
         // Arrange
-        mockDb.query
+        (mockDb.query as jest.Mock)
           .mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] })
           .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rowCount: 1 })
@@ -405,7 +405,7 @@ describe('Password Routes Integration Tests', () => {
       it('should return 400 when current password is incorrect', async () => {
         // Arrange
         setupBcryptMocks(MOCK_HASHES.new, false);
-        mockDb.query.mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
+        (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [{ password: MOCK_HASHES.current }] });
 
         // Act
         const response = await request(app)
@@ -436,7 +436,7 @@ describe('Password Service Unit Tests', () => {
 
   describe('Password Reset Token Generation', () => {
     it('should generate a valid reset token', async () => {
-      const token = await passwordService.generatePasswordResetToken();
+      const token = await passwordService.generatePasswordResetToken('user-id');
       
       expect(token).toBeDefined();
       expect(typeof token).toBe('string');
@@ -444,8 +444,8 @@ describe('Password Service Unit Tests', () => {
     });
 
     it('should generate unique tokens for multiple calls', async () => {
-      const token1 = await passwordService.generatePasswordResetToken();
-      const token2 = await passwordService.generatePasswordResetToken();
+      const token1 = await passwordService.generatePasswordResetToken('user-id');
+      const token2 = await passwordService.generatePasswordResetToken('user-id');
       
       expect(token1).not.toBe(token2);
     });
@@ -454,42 +454,42 @@ describe('Password Service Unit Tests', () => {
   describe('Password Strength Validation', () => {
     it('should accept strong password', () => {
       const result = passwordService.validatePasswordStrength('StrongPassword123!');
-      expect(result).toBe(true);
+      expect(result.isValid).toBe(true);
     });
 
     it('should reject weak password', () => {
       const result = passwordService.validatePasswordStrength('weak');
-      expect(result).toBe(false);
+      expect(result.isValid).toBe(false);
     });
 
     it('should reject no numbers', () => {
       const result = passwordService.validatePasswordStrength('WeakPassword!');
-      expect(result).toBe(false);
+      expect(result.isValid).toBe(false);
     });
 
     it('should reject no numbers or special chars', () => {
       const result = passwordService.validatePasswordStrength('WeakPassword');
-      expect(result).toBe(false);
+      expect(result.isValid).toBe(false);
     });
 
     it('should reject no special characters', () => {
       const result = passwordService.validatePasswordStrength('WeakPassword123');
-      expect(result).toBe(false);
+      expect(result.isValid).toBe(false);
     });
 
     it('should reject no lowercase', () => {
       const result = passwordService.validatePasswordStrength('WEAKPASSWORD123!');
-      expect(result).toBe(false);
+      expect(result.isValid).toBe(false);
     });
 
     it('should reject no uppercase', () => {
       const result = passwordService.validatePasswordStrength('weakpassword123!');
-      expect(result).toBe(false);
+      expect(result.isValid).toBe(false);
     });
 
     it('should reject too short', () => {
       const result = passwordService.validatePasswordStrength('Short1!');
-      expect(result).toBe(false);
+      expect(result.isValid).toBe(false);
     });
   });
 

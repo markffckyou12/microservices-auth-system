@@ -10,55 +10,6 @@ jest.mock('bcryptjs', () => ({
   compare: jest.fn().mockResolvedValue(true)
 }));
 
-// Mock express-validator properly
-jest.mock('express-validator', () => ({
-  body: jest.fn(() => ({
-    isEmail: jest.fn(() => ({
-      withMessage: jest.fn(() => ({
-        isEmail: jest.fn(() => ({
-          withMessage: jest.fn(() => [])
-        })),
-        notEmpty: jest.fn(() => ({
-          withMessage: jest.fn(() => [])
-        })),
-        isLength: jest.fn(() => ({
-          withMessage: jest.fn(() => [])
-        }))
-      }))
-    })),
-    notEmpty: jest.fn(() => ({
-      withMessage: jest.fn(() => ({
-        isEmail: jest.fn(() => ({
-          withMessage: jest.fn(() => [])
-        })),
-        notEmpty: jest.fn(() => ({
-          withMessage: jest.fn(() => [])
-        })),
-        isLength: jest.fn(() => ({
-          withMessage: jest.fn(() => [])
-        }))
-      }))
-    })),
-    isLength: jest.fn(() => ({
-      withMessage: jest.fn(() => ({
-        isEmail: jest.fn(() => ({
-          withMessage: jest.fn(() => [])
-        })),
-        notEmpty: jest.fn(() => ({
-          withMessage: jest.fn(() => [])
-        })),
-        isLength: jest.fn(() => ({
-          withMessage: jest.fn(() => [])
-        }))
-      }))
-    }))
-  })),
-  validationResult: jest.fn(() => ({
-    isEmpty: jest.fn(() => true),
-    array: jest.fn(() => [])
-  }))
-}));
-
 // Mock the database with proper typing
 const mockDb = {
   query: jest.fn()
@@ -84,12 +35,10 @@ describe('Password Routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Reset express-validator mock to return no errors by default
-    const { validationResult } = require('express-validator');
-    (validationResult as jest.Mock).mockReturnValue({
-      isEmpty: jest.fn(() => true),
-      array: jest.fn(() => [])
-    });
+    // Reset bcrypt mocks
+    const bcrypt = require('bcryptjs');
+    (bcrypt.hash as jest.Mock).mockResolvedValue('$2a$12$mockedhash');
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
   });
 
   describe('POST /auth/password/reset-request', () => {
@@ -125,18 +74,13 @@ describe('Password Routes', () => {
     });
 
     it('should return 400 if email is missing', async () => {
-      // Mock validation error for missing email
-      const { validationResult } = require('express-validator');
-      (validationResult as jest.Mock).mockReturnValueOnce({
-        isEmpty: jest.fn(() => false),
-        array: jest.fn(() => [{ msg: 'Email is required' }])
-      });
-
       const response = await request(app)
         .post('/auth/password/reset-request')
         .send({});
 
       expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Email is required');
     });
   });
 
@@ -168,33 +112,41 @@ describe('Password Routes', () => {
     });
 
     it('should return 400 if token is missing', async () => {
-      // Mock validation error for missing token
-      const { validationResult } = require('express-validator');
-      (validationResult as jest.Mock).mockReturnValueOnce({
-        isEmpty: jest.fn(() => false),
-        array: jest.fn(() => [{ msg: 'Token is required' }])
-      });
-
       const response = await request(app)
         .post('/auth/password/reset')
         .send({ newPassword: 'NewPassword123!' });
 
       expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Token is required');
     });
 
     it('should return 400 if new password is missing', async () => {
-      // Mock validation error for missing password
-      const { validationResult } = require('express-validator');
-      (validationResult as jest.Mock).mockReturnValueOnce({
-        isEmpty: jest.fn(() => false),
-        array: jest.fn(() => [{ msg: 'New password is required' }])
-      });
-
       const response = await request(app)
         .post('/auth/password/reset')
         .send({ token: 'valid-token' });
 
       expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('New password is required');
+    });
+
+    it('should return 400 for invalid or expired token', async () => {
+      // Mock invalid token
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({
+        rows: []
+      });
+
+      const response = await request(app)
+        .post('/auth/password/reset')
+        .send({
+          token: 'invalid-token',
+          newPassword: 'NewPassword123!'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Invalid or expired token');
     });
   });
 
@@ -229,33 +181,63 @@ describe('Password Routes', () => {
     });
 
     it('should return 400 if current password is missing', async () => {
-      // Mock validation error for missing current password
-      const { validationResult } = require('express-validator');
-      (validationResult as jest.Mock).mockReturnValueOnce({
-        isEmpty: jest.fn(() => false),
-        array: jest.fn(() => [{ msg: 'Current password is required' }])
-      });
-
       const response = await request(app)
         .post('/auth/password/change')
         .send({ newPassword: 'NewPassword123!' });
 
       expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Current password is required');
     });
 
     it('should return 400 if new password is missing', async () => {
-      // Mock validation error for missing new password
-      const { validationResult } = require('express-validator');
-      (validationResult as jest.Mock).mockReturnValueOnce({
-        isEmpty: jest.fn(() => false),
-        array: jest.fn(() => [{ msg: 'New password is required' }])
-      });
-
       const response = await request(app)
         .post('/auth/password/change')
         .send({ currentPassword: 'OldPassword123!' });
 
       expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('New password is required');
+    });
+
+    it('should return 400 if current password is incorrect', async () => {
+      // Mock bcrypt.compare to return false (incorrect password)
+      const bcrypt = require('bcryptjs');
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+      // Mock database call to get current password
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({
+        rows: [{ password: '$2a$12$mockedhash' }]
+      });
+
+      const response = await request(app)
+        .post('/auth/password/change')
+        .send({
+          currentPassword: 'WrongPassword123!',
+          newPassword: 'NewPassword123!'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Current password is incorrect');
+    });
+
+    it('should return 400 if user is not authenticated', async () => {
+      // Create app without authentication middleware
+      const appWithoutAuth = express();
+      appWithoutAuth.use(express.json());
+      appWithoutAuth.use('/auth/password', createPasswordRouter(new PasswordServiceImpl(mockDb)));
+
+      const response = await request(appWithoutAuth)
+        .post('/auth/password/change')
+        .send({
+          currentPassword: 'OldPassword123!',
+          newPassword: 'NewPassword123!'
+        });
+
+      expect(response.status).toBe(401);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Authentication required');
     });
   });
 });
@@ -266,6 +248,11 @@ describe('Password Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     passwordService = new PasswordServiceImpl(mockDb);
+    
+    // Reset bcrypt mocks
+    const bcrypt = require('bcryptjs');
+    (bcrypt.hash as jest.Mock).mockResolvedValue('$2a$12$mockedhash');
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
   });
 
   it('should generate password reset token', async () => {
@@ -317,11 +304,6 @@ describe('Password Service', () => {
   });
 
   it('should change password successfully', async () => {
-    // Reset bcrypt mock to ensure it returns true for compare
-    const bcrypt = require('bcryptjs');
-    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-    (bcrypt.hash as jest.Mock).mockResolvedValueOnce('$2a$12$newhash');
-
     // Mock database calls
     (mockDb.query as jest.Mock).mockResolvedValueOnce({
       rows: [{ password: '$2a$12$mockedhash' }]
@@ -350,6 +332,49 @@ describe('Password Service', () => {
     });
 
     const result = await passwordService.changePassword('user-1', 'WrongPassword123!', 'NewPassword123!');
+    
+    expect(result).toBe(false);
+  });
+
+  it('should return false if user not found', async () => {
+    // Mock database call to return no user
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
+      rows: []
+    });
+
+    const result = await passwordService.changePassword('nonexistent-user', 'OldPassword123!', 'NewPassword123!');
+    
+    expect(result).toBe(false);
+  });
+
+  it('should return false if password validation fails', async () => {
+    // Mock database call to get current password
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
+      rows: [{ password: '$2a$12$mockedhash' }]
+    });
+
+    const result = await passwordService.changePassword('user-1', 'OldPassword123!', 'weak');
+    
+    expect(result).toBe(false);
+  });
+
+  it('should return false if password is reused', async () => {
+    // Mock database call to get current password
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
+      rows: [{ password: '$2a$12$mockedhash' }]
+    });
+
+    // Mock password history to return reused password
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
+      rows: [{ password_hash: '$2a$12$reusedhash' }]
+    });
+
+    // Mock bcrypt.compare to return true for reused password
+    const bcrypt = require('bcryptjs');
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true); // Current password
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true); // Reused password
+
+    const result = await passwordService.changePassword('user-1', 'OldPassword123!', 'ReusedPassword123!');
     
     expect(result).toBe(false);
   });

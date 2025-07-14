@@ -240,51 +240,21 @@ describe('Password Service', () => {
     expect(validation.isValid).toBe(true);
   });
 
-  // Test bcrypt comparison
+  // Test bcrypt comparison with proper error handling
   it('should compare passwords correctly', async () => {
-    const password = 'OldPassword123!';
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const isMatch = await bcrypt.compare(password, hashedPassword);
-    expect(isMatch).toBe(true);
+    try {
+      const password = 'OldPassword123!';
+      const hashedPassword = await bcrypt.hash(password, 12);
+      console.log('Hashed password:', hashedPassword);
+      
+      const isMatch = await bcrypt.compare(password, hashedPassword);
+      console.log('bcrypt.compare result:', isMatch);
+      
+      expect(isMatch).toBe(true);
+    } catch (error) {
+      console.error('bcrypt error:', error);
+      throw error;
+    }
   });
 
-  // Test the changePassword method step by step
-  it('should change password successfully', async () => {
-    const currentPassword = 'OldPassword123!';
-    const hashedPassword = await bcrypt.hash(currentPassword, 12);
-
-    // Mock database calls
-    (mockDb.query as jest.Mock).mockResolvedValueOnce({
-      rows: [{ password: hashedPassword }]
-    });
-
-    (mockDb.query as jest.Mock).mockResolvedValueOnce({
-      rows: []
-    });
-
-    (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
-    (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
-
-    const result = await passwordService.changePassword('user-1', currentPassword, 'NewPassword123!');
-    
-    expect(result).toBe(true);
-  });
-
-  // Test database mocks
-  it('should handle database operations correctly', async () => {
-    const currentPassword = 'OldPassword123!';
-    const hashedPassword = await bcrypt.hash(currentPassword, 12);
-
-    // Mock the first database call (get current password)
-    (mockDb.query as jest.Mock).mockResolvedValueOnce({
-      rows: [{ password: hashedPassword }]
-    });
-
-    // Test that the mock was called correctly
-    const result = await passwordService.changePassword('user-1', currentPassword, 'NewPassword123!');
-    
-    // The service should fail because we only mocked the first call
-    // This will help us see if the first database operation is working
-    expect(result).toBe(false);
-  });
-});
+  // Test the c

@@ -257,4 +257,25 @@ describe('Password Service', () => {
     }
   });
 
-  // Test the c
+  // Test the changePassword method step by step
+  it('should change password successfully', async () => {
+    const currentPassword = 'OldPassword123!';
+    const hashedPassword = await bcrypt.hash(currentPassword, 12);
+
+    // Mock database calls
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
+      rows: [{ password: hashedPassword }]
+    });
+
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
+      rows: []
+    });
+
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+
+    const result = await passwordService.changePassword('user-1', currentPassword, 'NewPassword123!');
+    
+    expect(result).toBe(true);
+  });
+});

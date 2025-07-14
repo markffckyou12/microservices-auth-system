@@ -1,10 +1,10 @@
 import { RBACService } from '../../src/services/rbac';
 import { Pool } from 'pg';
 
-// Mock the database pool with proper Jest typing
+// Mock the database pool with proper typing
 const mockPool = {
   query: jest.fn()
-} as jest.Mocked<Pool>;
+} as unknown as jest.Mocked<Pool>;
 
 describe('RBAC Service', () => {
   let rbacService: RBACService;
@@ -259,6 +259,32 @@ describe('RBAC Service', () => {
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('SELECT COUNT(*) as count FROM user_roles ur'),
         ['user-1', 'admin']
+      );
+    });
+  });
+
+  describe('getRolePermissions', () => {
+    it('should get role permissions', async () => {
+      const mockPermissions = [
+        {
+          id: 'perm-1',
+          name: 'read_users',
+          resource: 'users',
+          action: 'read',
+          description: 'Read user data'
+        }
+      ];
+
+      (mockPool.query as jest.Mock).mockResolvedValue({
+        rows: mockPermissions
+      });
+
+      const result = await rbacService.getRolePermissions('role-1');
+
+      expect(result).toEqual(mockPermissions);
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT p.* FROM permissions p'),
+        ['role-1']
       );
     });
   });

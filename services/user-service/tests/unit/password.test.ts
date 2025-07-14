@@ -1,13 +1,12 @@
-import request from 'supertest';
 import express from 'express';
 import { Pool } from 'pg';
 import { PasswordServiceImpl } from '../../src/services/password';
 import createPasswordRouter from '../../src/routes/password';
 
-// Mock the database with proper Jest typing
+// Mock the database with proper typing
 const mockDb = {
   query: jest.fn()
-} as jest.Mocked<Pool>;
+} as unknown as jest.Mocked<Pool>;
 
 // Create test app
 const app = express();

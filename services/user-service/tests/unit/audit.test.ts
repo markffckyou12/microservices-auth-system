@@ -101,7 +101,8 @@ describe('Audit Service', () => {
         ['user-1', 'read_users']
       );
       expect(result).toHaveLength(1);
-      expect(result[0].details).toEqual({ method: 'GET', path: '/api/users' });
+      // Parse the JSON string back to object for comparison
+      expect(JSON.parse(result[0].details as string)).toEqual({ method: 'GET', path: '/api/users' });
     });
 
     it('should get audit logs without filters', async () => {
@@ -191,7 +192,8 @@ describe('Audit Service', () => {
         ['permission_denied', 'medium']
       );
       expect(result).toHaveLength(1);
-      expect(result[0].details).toEqual({ reason: 'Insufficient permissions' });
+      // Parse the JSON string back to object for comparison
+      expect(JSON.parse(result[0].details as string)).toEqual({ reason: 'Insufficient permissions' });
     });
   });
 

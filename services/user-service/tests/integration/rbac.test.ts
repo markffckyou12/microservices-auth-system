@@ -25,6 +25,7 @@ const mockRBACService: jest.Mocked<RBACService> = {
   revokeRoleFromUser: jest.fn(),
   hasRole: jest.fn(),
   checkPermission: jest.fn(),
+  getRolePermissions: jest.fn(),
   addPermissionToRole: jest.fn(),
   removePermissionFromRole: jest.fn(),
   hasPermission: jest.fn()

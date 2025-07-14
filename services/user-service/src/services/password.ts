@@ -234,4 +234,7 @@ export class PasswordServiceImpl implements PasswordService {
   private generateResetToken(): string {
     return crypto.randomBytes(32).toString('hex');
   }
-} 
+}
+
+// Export for backward compatibility
+export default PasswordServiceImpl; 

@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-export default function createUserRoutes(db: Pool, authMiddleware?: AuthorizationMiddleware) {
+export function setupUserRoutes(db: Pool, authMiddleware?: AuthorizationMiddleware) {
   const router = Router();
 
   // RBAC middleware fallback (for tests)
@@ -111,4 +111,7 @@ export default function createUserRoutes(db: Pool, authMiddleware?: Authorizatio
   );
 
   return router;
-} 
+}
+
+// Export for backward compatibility
+export default setupUserRoutes; 

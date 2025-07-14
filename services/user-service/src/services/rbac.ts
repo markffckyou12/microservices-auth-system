@@ -69,9 +69,19 @@ export class RBACService {
     return result.rows[0] || null;
   }
 
+  // Alias for getRoleById for backward compatibility
+  async getRole(id: string): Promise<Role | null> {
+    return this.getRoleById(id);
+  }
+
   async getAllRoles(): Promise<Role[]> {
     const result = await this.db.query('SELECT * FROM roles ORDER BY name');
     return result.rows;
+  }
+
+  // Alias for getAllRoles for backward compatibility
+  async listRoles(): Promise<Role[]> {
+    return this.getAllRoles();
   }
 
   async updateRole(id: string, data: CreateRoleData): Promise<Role | null> {
@@ -110,6 +120,11 @@ export class RBACService {
     return result.rows;
   }
 
+  // Alias for getAllPermissions for backward compatibility
+  async listPermissions(): Promise<Permission[]> {
+    return this.getAllPermissions();
+  }
+
   async assignRoleToUser(userId: string, roleId: string, assignedBy: string): Promise<UserRole> {
     const result = await this.db.query(
       'INSERT INTO user_roles (user_id, role_id, assigned_by) VALUES ($1, $2, $3) RETURNING *',
@@ -138,6 +153,11 @@ export class RBACService {
     );
     
     return (result.rowCount || 0) > 0;
+  }
+
+  // Alias for removeRoleFromUser for backward compatibility
+  async revokeRoleFromUser(userId: string, roleId: string): Promise<boolean> {
+    return this.removeRoleFromUser(userId, roleId);
   }
 
   async hasRole(userId: string, roleName: string): Promise<boolean> {
@@ -180,4 +200,7 @@ export class RBACService {
     
     return result.rows;
   }
-} 
+}
+
+// Export for backward compatibility
+export const RBACServiceImpl = RBACService; 

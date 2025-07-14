@@ -5,7 +5,7 @@ import { PasswordServiceImpl } from '../../src/services/password';
 import createPasswordRouter from '../../src/routes/password';
 import bcrypt from 'bcryptjs';
 
-// Mock express-validator completely
+// Mock express-validator
 jest.mock('express-validator', () => ({
   body: jest.fn(() => ({
     isEmail: jest.fn(() => ({
@@ -17,10 +17,6 @@ jest.mock('express-validator', () => ({
     isLength: jest.fn(() => ({
       withMessage: jest.fn(() => [])
     }))
-  })),
-  validationResult: jest.fn(() => ({
-    isEmpty: () => true,
-    array: () => []
   }))
 }));
 
@@ -33,15 +29,13 @@ const mockDb = {
 const app = express();
 app.use(express.json());
 
-// Mock authentication middleware for change password tests
+// Mock authentication middleware
 app.use((req, res, next) => {
-  if (req.path.includes('/change')) {
-    req.user = {
-      id: 'user-1',
-      email: 'test@example.com',
-      roles: ['user']
-    };
-  }
+  req.user = {
+    id: 'user-1',
+    email: 'test@example.com',
+    roles: ['user']
+  };
   next();
 });
 
@@ -143,18 +137,20 @@ describe('Password Routes', () => {
       const currentPassword = 'OldPassword123!';
       const hashedPassword = await bcrypt.hash(currentPassword, 12);
 
-      // Mock current password hash
+      // Mock current password hash lookup
       (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: [{ password: hashedPassword }]
       });
 
-      // Mock password history check
+      // Mock password history check (empty - no reused passwords)
       (mockDb.query as jest.Mock).mockResolvedValueOnce({
         rows: []
       });
 
       // Mock password update
       (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+
+      // Mock password history insertion
       (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
       const response = await request(app)

@@ -164,6 +164,7 @@ describe('Password Routes', () => {
       // Add debugging to see what's happening
       console.log('Response status:', response.status);
       console.log('Response body:', response.body);
+      console.log('Mock calls:', (mockDb.query as jest.Mock).mock.calls);
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -237,24 +238,34 @@ describe('Password Service', () => {
     consoleSpy.mockRestore();
   });
 
-  // Add a direct test of the changePassword method
+  // Add a direct test of the changePassword method with debugging
   it('should change password successfully', async () => {
     const currentPassword = 'OldPassword123!';
     const hashedPassword = await bcrypt.hash(currentPassword, 12);
 
-    // Mock database calls
+    // Mock database calls with debugging
+    console.log('Setting up mocks...');
+    
+    // 1. Get current password hash
     (mockDb.query as jest.Mock).mockResolvedValueOnce({
       rows: [{ password: hashedPassword }]
     });
 
+    // 2. Check password history (empty result - no reused passwords)
     (mockDb.query as jest.Mock).mockResolvedValueOnce({
       rows: []
     });
 
-    (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+    // 3. Update user password
     (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
+    // 4. Insert into password history
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+
+    console.log('Calling changePassword...');
     const result = await passwordService.changePassword('user-1', currentPassword, 'NewPassword123!');
+    console.log('Result:', result);
+    console.log('Mock calls:', (mockDb.query as jest.Mock).mock.calls);
     
     expect(result).toBe(true);
   });

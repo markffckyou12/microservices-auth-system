@@ -5,6 +5,12 @@ import { PasswordServiceImpl } from '../../src/services/password';
 import createPasswordRouter from '../../src/routes/password';
 import bcrypt from 'bcryptjs';
 
+// Mock bcrypt
+jest.mock('bcryptjs', () => ({
+  hash: jest.fn().mockResolvedValue('$2a$12$mockedhash'),
+  compare: jest.fn().mockResolvedValue(true)
+}));
+
 // Mock express-validator
 jest.mock('express-validator', () => ({
   body: jest.fn(() => ({
@@ -133,14 +139,10 @@ describe('Password Routes', () => {
 
   describe('POST /auth/password/change', () => {
     it('should change password for authenticated user', async () => {
-      // Create a proper hashed password for the test
-      const currentPassword = 'OldPassword123!';
-      const hashedPassword = await bcrypt.hash(currentPassword, 12);
-
       // Mock the database calls in the exact order they happen:
       // 1. Get current password hash
       (mockDb.query as jest.Mock).mockResolvedValueOnce({
-        rows: [{ password: hashedPassword }]
+        rows: [{ password: '$2a$12$mockedhash' }]
       });
 
       // 2. Check password history (empty result - no reused passwords)
@@ -157,7 +159,7 @@ describe('Password Routes', () => {
       const response = await request(app)
         .post('/auth/password/change')
         .send({
-          currentPassword: currentPassword,
+          currentPassword: 'OldPassword123!',
           newPassword: 'NewPassword123!'
         });
 
@@ -236,35 +238,25 @@ describe('Password Service', () => {
   // Test password validation specifically
   it('should validate NewPassword123! correctly', () => {
     const validation = passwordService.validatePasswordStrength('NewPassword123!');
-    console.log('Password validation result:', validation);
     expect(validation.isValid).toBe(true);
   });
 
-  // Test bcrypt comparison with proper error handling
+  // Test bcrypt comparison with mocked bcrypt
   it('should compare passwords correctly', async () => {
-    try {
-      const password = 'OldPassword123!';
-      const hashedPassword = await bcrypt.hash(password, 12);
-      console.log('Hashed password:', hashedPassword);
-      
-      const isMatch = await bcrypt.compare(password, hashedPassword);
-      console.log('bcrypt.compare result:', isMatch);
-      
-      expect(isMatch).toBe(true);
-    } catch (error) {
-      console.error('bcrypt error:', error);
-      throw error;
-    }
+    const password = 'OldPassword123!';
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const isMatch = await bcrypt.compare(password, hashedPassword);
+    
+    expect(isMatch).toBe(true);
+    expect(bcrypt.hash).toHaveBeenCalledWith(password, 12);
+    expect(bcrypt.compare).toHaveBeenCalledWith(password, hashedPassword);
   });
 
   // Test the changePassword method step by step
   it('should change password successfully', async () => {
-    const currentPassword = 'OldPassword123!';
-    const hashedPassword = await bcrypt.hash(currentPassword, 12);
-
     // Mock database calls
     (mockDb.query as jest.Mock).mockResolvedValueOnce({
-      rows: [{ password: hashedPassword }]
+      rows: [{ password: '$2a$12$mockedhash' }]
     });
 
     (mockDb.query as jest.Mock).mockResolvedValueOnce({
@@ -274,7 +266,7 @@ describe('Password Service', () => {
     (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
     (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
-    const result = await passwordService.changePassword('user-1', currentPassword, 'NewPassword123!');
+    const result = await passwordService.changePassword('user-1', 'OldPassword123!', 'NewPassword123!');
     
     expect(result).toBe(true);
   });

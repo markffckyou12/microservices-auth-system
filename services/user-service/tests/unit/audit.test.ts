@@ -1,4 +1,3 @@
-import { AuditServiceImpl } from '../../src/services/audit';
 import { Pool } from 'pg';
 
 // Mock pg module
@@ -102,7 +101,7 @@ describe('Audit Service', () => {
       );
       expect(result).toHaveLength(1);
       // Parse the JSON string back to object for comparison
-      expect(JSON.parse(result[0].details as string)).toEqual({ method: 'GET', path: '/api/users' });
+      expect(JSON.parse(result[0].details as unknown as string)).toEqual({ method: 'GET', path: '/api/users' });
     });
 
     it('should get audit logs without filters', async () => {
@@ -193,7 +192,7 @@ describe('Audit Service', () => {
       );
       expect(result).toHaveLength(1);
       // Parse the JSON string back to object for comparison
-      expect(JSON.parse(result[0].details as string)).toEqual({ reason: 'Insufficient permissions' });
+      expect(JSON.parse(result[0].details as unknown as string)).toEqual({ reason: 'Insufficient permissions' });
     });
   });
 

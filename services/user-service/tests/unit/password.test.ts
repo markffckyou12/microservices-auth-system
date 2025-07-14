@@ -1,3 +1,4 @@
+import request from 'supertest';
 import express from 'express';
 import { Pool } from 'pg';
 import { PasswordServiceImpl } from '../../src/services/password';

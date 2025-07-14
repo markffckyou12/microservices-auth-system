@@ -4,9 +4,10 @@ import { setupRBACRoutes } from '../../src/routes/rbac';
 import { RBACService } from '../../src/services/rbac';
 import { AuditService } from '../../src/services/audit';
 import { AuthorizationMiddleware } from '../../src/middleware/authorization';
+import { Pool } from 'pg';
 
 // Mock services
-const mockRBACService: jest.Mocked<RBACService> = {
+const mockRBACService = {
   createRole: jest.fn(),
   getRoleById: jest.fn(),
   getRoleByName: jest.fn(),
@@ -28,8 +29,9 @@ const mockRBACService: jest.Mocked<RBACService> = {
   getRolePermissions: jest.fn(),
   addPermissionToRole: jest.fn(),
   removePermissionFromRole: jest.fn(),
-  hasPermission: jest.fn()
-};
+  hasPermission: jest.fn(),
+  db: {} as Pool // Add the db property
+} as jest.Mocked<RBACService>;
 
 const mockAuditService: jest.Mocked<AuditService> = {
   logAction: jest.fn(),

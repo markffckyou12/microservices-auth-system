@@ -161,6 +161,10 @@ describe('Password Routes', () => {
           newPassword: 'NewPassword123!'
         });
 
+      // Add debugging to see what's happening
+      console.log('Response status:', response.status);
+      console.log('Response body:', response.body);
+
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
     });
@@ -231,5 +235,27 @@ describe('Password Service', () => {
     );
 
     consoleSpy.mockRestore();
+  });
+
+  // Add a direct test of the changePassword method
+  it('should change password successfully', async () => {
+    const currentPassword = 'OldPassword123!';
+    const hashedPassword = await bcrypt.hash(currentPassword, 12);
+
+    // Mock database calls
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
+      rows: [{ password: hashedPassword }]
+    });
+
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({
+      rows: []
+    });
+
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+    (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
+
+    const result = await passwordService.changePassword('user-1', currentPassword, 'NewPassword123!');
+    
+    expect(result).toBe(true);
   });
 });

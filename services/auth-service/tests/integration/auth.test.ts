@@ -22,9 +22,11 @@ jest.mock('passport-github2', () => ({
   Strategy: jest.fn()
 }));
 
+// Mock speakeasy with proper structure
 jest.mock('speakeasy', () => ({
   generateSecret: jest.fn(() => ({
     ascii: 'mock-secret',
+    base32: 'mock-secret-base32',
     otpauth_url: 'otpauth://totp/MockApp:mockuser?secret=mock-secret&issuer=MockApp'
   })),
   totp: {

@@ -22,7 +22,7 @@ const Layout: React.FC = () => {
   ];
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <div className="sidebar">
         <div className="p-6">
@@ -37,8 +37,8 @@ const Layout: React.FC = () => {
                   onClick={() => navigate(item.path)}
                   className={`w-full text-left px-6 py-3 flex items-center space-x-3 hover:bg-gray-100 transition-colors ${
                     location.pathname === item.path
-                      ? 'bg-primary text-white'
-                      : 'text-text'
+                      ? 'bg-blue-500 text-white'
+                      : 'text-gray-900'
                   }`}
                 >
                   <span>{item.icon}</span>
@@ -53,15 +53,15 @@ const Layout: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="bg-surface border-b border-border px-6 py-4">
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-text">
+                          <h2 className="text-lg font-semibold text-gray-900">
               {navigationItems.find(item => item.path === location.pathname)?.name || 'Dashboard'}
             </h2>
             
             <div className="flex items-center space-x-4">
               {user && (
-                <span className="text-text">
+                <span className="text-gray-900">
                   Welcome, {user.firstName || user.username}
                 </span>
               )}

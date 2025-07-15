@@ -38,11 +38,11 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="card w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-text mb-2">RBAC Admin</h1>
-          <p className="text-secondary">Sign in to your account</p>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">RBAC Admin</h1>
+          <p className="text-gray-600">Sign in to your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -53,7 +53,7 @@ const Login: React.FC = () => {
           )}
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-text mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
               Email
             </label>
             <input
@@ -69,7 +69,7 @@ const Login: React.FC = () => {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-text mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-2">
               Password
             </label>
             <input
@@ -94,7 +94,7 @@ const Login: React.FC = () => {
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-sm text-secondary">
+          <p className="text-sm text-gray-600">
             Demo credentials: admin@example.com / password
           </p>
         </div>

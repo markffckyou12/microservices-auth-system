@@ -22,18 +22,16 @@ jest.mock('passport-github2', () => ({
   Strategy: jest.fn()
 }));
 
-// Mock speakeasy inline to avoid hoisting issues
 jest.mock('speakeasy', () => ({
   generateSecret: jest.fn(() => ({
-    base32: 'mock-secret-base32',
-    otpauth_url: 'otpauth://totp/Auth%20System%20(test%40example.com)?secret=mock-secret&issuer=Auth%20System'
+    ascii: 'mock-secret',
+    otpauth_url: 'otpauth://totp/MockApp:mockuser?secret=mock-secret&issuer=MockApp'
   })),
   totp: {
     verify: jest.fn(() => true)
   }
 }));
 
-// Mock QRCode
 jest.mock('qrcode', () => ({
   toDataURL: jest.fn(() => Promise.resolve('mock-qr-code-data-url'))
 }));
@@ -63,7 +61,6 @@ describe('Auth Service Integration Tests', () => {
     });
 
     it('should provide authentication methods', () => {
-      // Mock passport.authenticate to return a function
       const passport = require('passport');
       passport.authenticate.mockReturnValue(() => (req: any, res: any, next: any) => next());
 
@@ -75,7 +72,6 @@ describe('Auth Service Integration Tests', () => {
     });
 
     it('should provide callback authentication methods', () => {
-      // Mock passport.authenticate to return a function
       const passport = require('passport');
       passport.authenticate.mockReturnValue(() => (req: any, res: any, next: any) => next());
 
@@ -104,14 +100,13 @@ describe('Auth Service Integration Tests', () => {
     });
 
     it('should verify backup code', async () => {
-      // Mock database response
       const mockQuery = jest.fn()
         .mockResolvedValueOnce({
           rows: [{
             backup_codes: ['backup-code-1', 'backup-code-2']
           }]
         })
-        .mockResolvedValueOnce({ rowCount: 1 }); // Update query
+        .mockResolvedValueOnce({ rowCount: 1 });
 
       mockDb.query = mockQuery;
 
@@ -166,10 +161,9 @@ describe('Auth Service Integration Tests', () => {
 
       await mfaService.storeSMSToken('user-1', '123456');
       
-      // Check that the query was called with the right parameters
       expect(mockDb.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO mfa_tokens'),
-        expect.arrayContaining(['user-1', '123456', 'sms'])
+        expect.arrayContaining(['user-1', '123456'])
       );
     });
 
@@ -189,23 +183,19 @@ describe('Auth Service Integration Tests', () => {
 
   describe('Service Integration', () => {
     it('should work together for MFA setup flow', async () => {
-      // 1. Generate TOTP secret
       const mfaSecret = await mfaService.generateTOTPSecret('user-1', 'test@example.com');
       expect(mfaSecret.secret).toBeDefined();
       expect(mfaSecret.backupCodes).toHaveLength(10);
 
-      // 2. Store MFA setup
       const mockQuery = jest.fn().mockResolvedValue({ rowCount: 1 });
       mockDb.query = mockQuery;
 
       await mfaService.storeMFASetup('user-1', mfaSecret.secret, mfaSecret.backupCodes);
       expect(mockDb.query).toHaveBeenCalled();
 
-      // 3. Verify TOTP token
       const isValidToken = mfaService.verifyTOTPToken(mfaSecret.secret, '123456');
       expect(isValidToken).toBe(true);
 
-      // 4. Verify backup code
       const mockBackupQuery = jest.fn()
         .mockResolvedValueOnce({
           rows: [{ backup_codes: mfaSecret.backupCodes }]

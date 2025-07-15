@@ -39,6 +39,16 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3001
+      # Database connection - use individual variables
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: auth_system
+      DB_USER: auth_user
+      DB_PASSWORD: auth_password
+      DB_MAX_CONNECTIONS: 20
+      DB_IDLE_TIMEOUT: 30000
+      DB_CONNECTION_TIMEOUT: 10000
+      # Keep DATABASE_URL for other services that might use it
       DATABASE_URL: postgresql://auth_user:auth_password@postgres:5432/auth_system
       REDIS_URL: redis://redis:6379
       JWT_SECRET: your-super-secret-jwt-key-change-in-production

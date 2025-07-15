@@ -31,14 +31,13 @@ describe('RBAC Service', () => {
 
       const result = await rbacService.createRole({
         name: 'admin',
-        description: 'Administrator role',
-        permissions: ['users:read', 'users:write']
+        description: 'Administrator role'
       });
 
       expect(result).toEqual(mockRole);
       expect(mockPool.query).toHaveBeenCalledWith(
-        'INSERT INTO roles (name, description, permissions) VALUES ($1, $2, $3) RETURNING *',
-        ['admin', 'Administrator role', ['users:read', 'users:write']]
+        'INSERT INTO roles (name, description, parent_role_id) VALUES ($1, $2, $3) RETURNING *',
+        ['admin', 'Administrator role', undefined]
       );
     });
   });
@@ -263,27 +262,36 @@ describe('RBAC Service', () => {
     });
   });
 
-  describe('getRolePermissions', () => {
-    it('should get role permissions', async () => {
-      const mockPermissions = [
-        {
-          id: 'perm-1',
-          name: 'read_users',
-          resource: 'users',
-          action: 'read',
-          description: 'Read user data'
-        }
-      ];
+  describe('getRoleWithPermissions', () => {
+    it('should get role with permissions', async () => {
+      const mockRoleWithPermissions = {
+        id: 'role-1',
+        name: 'admin',
+        description: 'Administrator role',
+        permissions: [
+          {
+            id: 'perm-1',
+            name: 'read_users',
+            resource: 'users',
+            action: 'read',
+            description: 'Read user data',
+            created_at: new Date()
+          }
+        ],
+        inherited_permissions: [],
+        created_at: new Date(),
+        updated_at: new Date()
+      };
 
       (mockPool.query as jest.Mock).mockResolvedValue({
-        rows: mockPermissions
+        rows: [mockRoleWithPermissions]
       });
 
-      const result = await rbacService.getRolePermissions('role-1');
+      const result = await rbacService.getRoleWithPermissions('role-1');
 
-      expect(result).toEqual(mockPermissions);
+      expect(result).toMatchObject(mockRoleWithPermissions);
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT p.* FROM permissions p'),
+        expect.stringContaining('WITH RECURSIVE role_hierarchy'),
         ['role-1']
       );
     });

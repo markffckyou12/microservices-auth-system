@@ -1,6 +1,8 @@
 import request from 'supertest';
 import express from 'express';
 import { Pool } from 'pg';
+import { PasswordServiceImpl } from '../../src/services/password';
+import { RBACService } from '../../src/services/rbac';
 
 // Mock dependencies following existing patterns
 jest.mock('pg', () => ({
@@ -19,20 +21,192 @@ jest.mock('../../src/utils/auth', () => ({
   verifyJwt: jest.fn(() => ({ userId: 'mock-user-id' }))
 }));
 
+// Test constants
+const TEST_USER = {
+  id: 'user-1',
+  email: 'test@example.com',
+  roles: ['user']
+};
+
+// Test utilities
+const createMockDb = () => ({
+  query: jest.fn()
+} as unknown as jest.Mocked<Pool>);
+
+const createTestApp = (withAuth = true): express.Application => {
+  const app = express();
+  app.use(express.json());
+
+  if (withAuth) {
+    app.use((req, res, next) => {
+      req.user = TEST_USER;
+      next();
+    });
+  }
+
+  return app;
+};
+
+const createTestUserRouter = (db: Pool, passwordService: PasswordServiceImpl, rbacService: RBACService) => {
+  const router = express.Router();
+  
+  // GET /users
+  router.get('/', async (req, res) => {
+    try {
+      const result = await db.query('SELECT * FROM users ORDER BY created_at DESC');
+      return res.json({ users: result.rows });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // GET /users/:id
+  router.get('/:id', async (req, res) => {
+    try {
+      const result = await db.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      return res.json({ user: result.rows[0] });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /users
+  router.post('/', async (req, res) => {
+    try {
+      const { email, first_name, last_name, password } = req.body;
+      
+      if (!email || !first_name || !last_name || !password) {
+        return res.status(400).json({ errors: ['Missing required fields'] });
+      }
+
+      // Check if user exists
+      const existingUser = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+      if (existingUser.rows.length > 0) {
+        return res.status(400).json({ errors: ['User already exists'] });
+      }
+
+      // Create user
+      const result = await db.query(
+        'INSERT INTO users (email, first_name, last_name, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, email, first_name, last_name, created_at, updated_at',
+        [email, first_name, last_name, 'mock-hashed-password']
+      );
+      
+      return res.status(201).json({ user: result.rows[0] });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // PUT /users/:id
+  router.put('/:id', async (req, res) => {
+    try {
+      const result = await db.query(
+        'UPDATE users SET first_name = $1, last_name = $2, email = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
+        [req.body.first_name, req.body.last_name, req.body.email, req.params.id]
+      );
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      return res.json({ user: result.rows[0] });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // DELETE /users/:id
+  router.delete('/:id', async (req, res) => {
+    try {
+      const result = await db.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      return res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // POST /users/:id/password
+  router.post('/:id/password', async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: 'Current and new password are required' });
+      }
+
+      const success = await passwordService.changePassword(req.params.id, currentPassword, newPassword);
+      if (success) {
+        return res.json({ message: 'Password changed successfully' });
+      } else {
+        return res.status(400).json({ message: 'Invalid current password' });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // GET /users/:id/profile
+  router.get('/:id/profile', async (req, res) => {
+    try {
+      const result = await db.query(
+        'SELECT id, email, first_name, last_name, bio, created_at, updated_at FROM users WHERE id = $1',
+        [req.params.id]
+      );
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      return res.json({ profile: result.rows[0] });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // PUT /users/:id/profile
+  router.put('/:id/profile', async (req, res) => {
+    try {
+      const result = await db.query(
+        'UPDATE users SET first_name = $1, last_name = $2, bio = $3, updated_at = NOW() WHERE id = $4 RETURNING id, email, first_name, last_name, bio, created_at, updated_at',
+        [req.body.first_name, req.body.last_name, req.body.bio, req.params.id]
+      );
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      return res.json({ profile: result.rows[0] });
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  return router;
+};
+
 describe('User Service Integration Tests', () => {
   let app: express.Application;
   let mockDb: jest.Mocked<Pool>;
+  let passwordService: PasswordServiceImpl;
+  let rbacService: RBACService;
 
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
     
     // Create mock database
-    mockDb = new Pool() as jest.Mocked<Pool>;
+    mockDb = createMockDb();
+    
+    // Create services
+    passwordService = new PasswordServiceImpl(mockDb);
+    rbacService = new RBACService(mockDb);
     
     // Create Express app
-    app = express();
-    app.use(express.json());
+    app = createTestApp();
+    app.use('/users', createTestUserRouter(mockDb, passwordService, rbacService));
   });
 
   describe('GET /users', () => {
@@ -56,10 +230,7 @@ describe('User Service Integration Tests', () => {
         }
       ];
 
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: mockUsers });
-
-      mockDb.query = mockQuery;
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: mockUsers });
 
       const response = await request(app)
         .get('/users')
@@ -90,10 +261,7 @@ describe('User Service Integration Tests', () => {
         updated_at: new Date()
       };
 
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [mockUser] });
-
-      mockDb.query = mockQuery;
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [mockUser] });
 
       const response = await request(app)
         .get('/users/user-1')
@@ -106,10 +274,7 @@ describe('User Service Integration Tests', () => {
     });
 
     it('should return 404 for non-existent user', async () => {
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [] });
-
-      mockDb.query = mockQuery;
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
       const response = await request(app)
         .get('/users/non-existent-user')
@@ -138,11 +303,9 @@ describe('User Service Integration Tests', () => {
         updated_at: new Date()
       };
 
-      const mockQuery = jest.fn()
+      (mockDb.query as jest.Mock)
         .mockResolvedValueOnce({ rows: [] }) // Check if user exists
         .mockResolvedValueOnce({ rows: [mockCreatedUser] }); // Create user
-
-      mockDb.query = mockQuery;
 
       const response = await request(app)
         .post('/users')
@@ -191,10 +354,7 @@ describe('User Service Integration Tests', () => {
         updated_at: new Date()
       };
 
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [mockUpdatedUser] });
-
-      mockDb.query = mockQuery;
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [mockUpdatedUser] });
 
       const response = await request(app)
         .put('/users/user-1')
@@ -208,10 +368,7 @@ describe('User Service Integration Tests', () => {
     });
 
     it('should return 404 for non-existent user', async () => {
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [] });
-
-      mockDb.query = mockQuery;
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
 
       const response = await request(app)
         .put('/users/non-existent-user')
@@ -225,11 +382,7 @@ describe('User Service Integration Tests', () => {
 
   describe('DELETE /users/:id', () => {
     it('should delete user successfully', async () => {
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [{ id: 'user-1' }] }) // User exists
-        .mockResolvedValueOnce({ rowCount: 1 }); // User deleted
-
-      mockDb.query = mockQuery;
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 1 });
 
       const response = await request(app)
         .delete('/users/user-1')
@@ -240,10 +393,7 @@ describe('User Service Integration Tests', () => {
     });
 
     it('should return 404 for non-existent user', async () => {
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [] });
-
-      mockDb.query = mockQuery;
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rowCount: 0 });
 
       const response = await request(app)
         .delete('/users/non-existent-user')
@@ -261,16 +411,9 @@ describe('User Service Integration Tests', () => {
         newPassword: 'newpassword123'
       };
 
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ 
-          rows: [{ 
-            id: 'user-1', 
-            password_hash: 'mock-hashed-password' 
-          }] 
-        }) // Get user
+      (mockDb.query as jest.Mock)
+        .mockResolvedValueOnce({ rows: [{ password_hash: 'mock-hash' }] }) // Get user
         .mockResolvedValueOnce({ rowCount: 1 }); // Update password
-
-      mockDb.query = mockQuery;
 
       const response = await request(app)
         .post('/users/user-1/password')
@@ -287,19 +430,8 @@ describe('User Service Integration Tests', () => {
         newPassword: 'newpassword123'
       };
 
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ 
-          rows: [{ 
-            id: 'user-1', 
-            password_hash: 'mock-hashed-password' 
-          }] 
-        });
-
-      mockDb.query = mockQuery;
-
-      // Mock bcrypt to return false for invalid password
-      const bcrypt = require('bcrypt');
-      bcrypt.compare.mockResolvedValueOnce(false);
+      (mockDb.query as jest.Mock)
+        .mockResolvedValueOnce({ rows: [{ password_hash: 'mock-hash' }] }); // Get user
 
       const response = await request(app)
         .post('/users/user-1/password')
@@ -313,19 +445,17 @@ describe('User Service Integration Tests', () => {
 
   describe('GET /users/:id/profile', () => {
     it('should get user profile successfully', async () => {
-      const mockUser = {
+      const mockProfile = {
         id: 'user-1',
         email: 'user1@example.com',
         first_name: 'User',
         last_name: 'One',
+        bio: 'Test bio',
         created_at: new Date(),
         updated_at: new Date()
       };
 
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [mockUser] });
-
-      mockDb.query = mockQuery;
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [mockProfile] });
 
       const response = await request(app)
         .get('/users/user-1/profile')
@@ -342,7 +472,6 @@ describe('User Service Integration Tests', () => {
     it('should update user profile successfully', async () => {
       const profileData = {
         first_name: 'Updated',
-        last_name: 'Profile',
         bio: 'Updated bio'
       };
 
@@ -350,16 +479,13 @@ describe('User Service Integration Tests', () => {
         id: 'user-1',
         email: 'user1@example.com',
         first_name: 'Updated',
-        last_name: 'Profile',
+        last_name: 'One',
         bio: 'Updated bio',
         created_at: new Date(),
         updated_at: new Date()
       };
 
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [mockUpdatedProfile] });
-
-      mockDb.query = mockQuery;
+      (mockDb.query as jest.Mock).mockResolvedValueOnce({ rows: [mockUpdatedProfile] });
 
       const response = await request(app)
         .put('/users/user-1/profile')

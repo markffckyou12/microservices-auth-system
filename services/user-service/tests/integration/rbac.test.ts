@@ -7,7 +7,7 @@ import { AuthorizationMiddleware } from '../../src/middleware/authorization';
 import { Pool } from 'pg';
 
 // Mock services - don't use jest.Mocked for RBACService due to private db property
-const mockRBACService = {
+const mockRBACService: jest.Mocked<RBACService> = {
   createRole: jest.fn(),
   getRoleById: jest.fn(),
   getRoleByName: jest.fn(),
@@ -25,23 +25,23 @@ const mockRBACService = {
   removeRoleFromUser: jest.fn(),
   revokeRoleFromUser: jest.fn(),
   hasRole: jest.fn(),
-  checkPermission: jest.fn(),
-  getRolePermissions: jest.fn(),
+  getRoleHierarchy: jest.fn(),
+  getRoleWithPermissions: jest.fn(),
   addPermissionToRole: jest.fn(),
   removePermissionFromRole: jest.fn(),
-  hasPermission: jest.fn()
+  checkPermission: jest.fn(),
+  hasPermission: jest.fn(),
+  getUserPermissions: jest.fn()
 } as any;
 
 const mockAuditService: jest.Mocked<AuditService> = {
-  logAction: jest.fn(),
+  logEvent: jest.fn(),
   getAuditLogs: jest.fn(),
-  getAuditLog: jest.fn(),
-  logSecurityEvent: jest.fn(),
-  getSecurityEvents: jest.fn(),
+  getAuditLogById: jest.fn(),
   getAuditSummary: jest.fn(),
-  getSecuritySummary: jest.fn(),
   getUserActivity: jest.fn(),
-  generateComplianceReport: jest.fn()
+  generateComplianceReport: jest.fn(),
+  exportAuditLogs: jest.fn()
 };
 
 const mockAuthMiddleware: jest.Mocked<AuthorizationMiddleware> = {
@@ -87,28 +87,31 @@ describe('RBAC Routes Integration', () => {
         id: 'role-1',
         name: 'admin',
         description: 'Administrator role',
-        permissions: ['perm-1', 'perm-2'],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        created_at: expect.any(String),
+        updated_at: expect.any(String)
       };
 
-      mockRBACService.createRole.mockResolvedValue(mockRole);
+      mockRBACService.createRole.mockResolvedValue({
+        id: 'role-1',
+        name: 'admin',
+        description: 'Administrator role',
+        created_at: new Date(),
+        updated_at: new Date()
+      });
 
       const response = await request(app)
         .post('/api/v1/rbac/roles')
         .send({
           name: 'admin',
-          description: 'Administrator role',
-          permissions: ['perm-1', 'perm-2']
+          description: 'Administrator role'
         });
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toEqual(mockRole);
+      expect(response.body.data).toMatchObject(mockRole);
       expect(mockRBACService.createRole).toHaveBeenCalledWith({
         name: 'admin',
-        description: 'Administrator role',
-        permissions: ['perm-1', 'perm-2']
+        description: 'Administrator role'
       });
     });
 
@@ -118,20 +121,27 @@ describe('RBAC Routes Integration', () => {
           id: 'role-1',
           name: 'admin',
           description: 'Administrator role',
-          permissions: ['perm-1', 'perm-2'],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          created_at: expect.any(String),
+          updated_at: expect.any(String)
         }
       ];
 
-      mockRBACService.getAllRoles.mockResolvedValue(mockRoles);
+      mockRBACService.getAllRoles.mockResolvedValue([
+        {
+          id: 'role-1',
+          name: 'admin',
+          description: 'Administrator role',
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+      ]);
 
       const response = await request(app)
         .get('/api/v1/rbac/roles');
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toEqual(mockRoles);
+      expect(response.body.data).toMatchObject(mockRoles);
       expect(mockRBACService.getAllRoles).toHaveBeenCalled();
     });
 
@@ -140,19 +150,24 @@ describe('RBAC Routes Integration', () => {
         id: 'role-1',
         name: 'admin',
         description: 'Administrator role',
-        permissions: ['perm-1', 'perm-2'],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        created_at: expect.any(String),
+        updated_at: expect.any(String)
       };
 
-      mockRBACService.getRoleById.mockResolvedValue(mockRole);
+      mockRBACService.getRoleById.mockResolvedValue({
+        id: 'role-1',
+        name: 'admin',
+        description: 'Administrator role',
+        created_at: new Date(),
+        updated_at: new Date()
+      });
 
       const response = await request(app)
         .get('/api/v1/rbac/roles/role-1');
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toEqual(mockRole);
+      expect(response.body.data).toMatchObject(mockRole);
       expect(mockRBACService.getRoleById).toHaveBeenCalledWith('role-1');
     });
 
@@ -175,10 +190,18 @@ describe('RBAC Routes Integration', () => {
         name: 'read_users',
         resource: 'users',
         action: 'read',
-        description: 'Read user data'
+        description: 'Read user data',
+        created_at: expect.any(String)
       };
 
-      mockRBACService.createPermission.mockResolvedValue(mockPermission);
+      mockRBACService.createPermission.mockResolvedValue({
+        id: 'perm-1',
+        name: 'read_users',
+        resource: 'users',
+        action: 'read',
+        description: 'Read user data',
+        created_at: new Date()
+      });
 
       const response = await request(app)
         .post('/api/v1/rbac/permissions')
@@ -191,7 +214,7 @@ describe('RBAC Routes Integration', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toEqual(mockPermission);
+      expect(response.body.data).toMatchObject(mockPermission);
     });
 
     it('should list permissions', async () => {
@@ -201,18 +224,28 @@ describe('RBAC Routes Integration', () => {
           name: 'read_users',
           resource: 'users',
           action: 'read',
-          description: 'Read user data'
+          description: 'Read user data',
+          created_at: expect.any(String)
         }
       ];
 
-      mockRBACService.getAllPermissions.mockResolvedValue(mockPermissions);
+      mockRBACService.getAllPermissions.mockResolvedValue([
+        {
+          id: 'perm-1',
+          name: 'read_users',
+          resource: 'users',
+          action: 'read',
+          description: 'Read user data',
+          created_at: new Date()
+        }
+      ]);
 
       const response = await request(app)
         .get('/api/v1/rbac/permissions');
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toEqual(mockPermissions);
+      expect(response.body.data).toMatchObject(mockPermissions);
     });
   });
 });

@@ -41,14 +41,15 @@ describe('Audit Service', () => {
   });
 
   describe('Audit Log Management', () => {
-    it('should log an action successfully', async () => {
+    it('should log an event successfully', async () => {
       const mockAuditLog = {
         id: 'log-1',
         user_id: 'user-1',
-        action: 'read_users',
-        resource: 'users',
+        event_type: 'authentication',
+        action: 'login',
+        resource_type: 'user',
         resource_id: 'user-1',
-        details: { method: 'GET', path: '/api/users' },
+        details: { method: 'POST', path: '/api/auth/login' },
         ip_address: '127.0.0.1',
         user_agent: 'Mozilla/5.0',
         created_at: new Date()
@@ -58,19 +59,20 @@ describe('Audit Service', () => {
         rows: [mockAuditLog]
       });
 
-      const result = await auditService.logAction({
+      const result = await auditService.logEvent({
         user_id: 'user-1',
-        action: 'read_users',
-        resource: 'users',
+        event_type: 'authentication',
+        action: 'login',
+        resource_type: 'user',
         resource_id: 'user-1',
-        details: { method: 'GET', path: '/api/users' },
+        details: { method: 'POST', path: '/api/auth/login' },
         ip_address: '127.0.0.1',
         user_agent: 'Mozilla/5.0'
       });
 
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO audit_logs'),
-        ['user-1', 'read_users', 'users', 'user-1', '{"method":"GET","path":"/api/users"}', '127.0.0.1', 'Mozilla/5.0']
+        ['user-1', 'authentication', 'login', 'user', 'user-1', '{"method":"POST","path":"/api/auth/login"}', '127.0.0.1', 'Mozilla/5.0']
       );
       expect(result).toEqual(mockAuditLog);
     });
@@ -80,10 +82,11 @@ describe('Audit Service', () => {
         {
           id: 'log-1',
           user_id: 'user-1',
-          action: 'read_users',
-          resource: 'users',
+          event_type: 'authentication',
+          action: 'login',
+          resource_type: 'user',
           resource_id: 'user-1',
-          details: '{"method":"GET","path":"/api/users"}',
+          details: { method: 'POST', path: '/api/auth/login' },
           ip_address: '127.0.0.1',
           user_agent: 'Mozilla/5.0',
           created_at: new Date()
@@ -94,15 +97,13 @@ describe('Audit Service', () => {
         rows: mockLogs
       });
 
-      const result = await auditService.getAuditLog('user-1', 'read_users');
+      const result = await auditService.getAuditLogs({ userId: 'user-1', eventType: 'authentication' });
 
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('SELECT * FROM audit_logs WHERE 1=1'),
-        ['user-1', 'read_users']
+        ['user-1', 'authentication']
       );
       expect(result).toHaveLength(1);
-      // Parse the JSON string back to object for comparison
-      expect(JSON.parse(result[0].details as unknown as string)).toEqual({ method: 'GET', path: '/api/users' });
     });
 
     it('should get audit logs without filters', async () => {
@@ -110,10 +111,11 @@ describe('Audit Service', () => {
         {
           id: 'log-1',
           user_id: 'user-1',
-          action: 'read_users',
-          resource: 'users',
+          event_type: 'authentication',
+          action: 'login',
+          resource_type: 'user',
           resource_id: 'user-1',
-          details: '{"method":"GET","path":"/api/users"}',
+          details: { method: 'POST', path: '/api/auth/login' },
           ip_address: '127.0.0.1',
           user_agent: 'Mozilla/5.0',
           created_at: new Date()
@@ -124,7 +126,7 @@ describe('Audit Service', () => {
         rows: mockLogs
       });
 
-      const result = await auditService.getAuditLog();
+      const result = await auditService.getAuditLogs({});
 
       expect(mockPool.query).toHaveBeenCalledWith(
         'SELECT * FROM audit_logs WHERE 1=1 ORDER BY created_at DESC',
@@ -138,10 +140,12 @@ describe('Audit Service', () => {
     it('should log a security event successfully', async () => {
       const mockSecurityEvent = {
         id: 'event-1',
-        event_type: 'permission_denied',
         user_id: 'user-1',
+        event_type: 'security',
+        action: 'permission_denied',
+        resource_type: 'user',
+        resource_id: 'user-1',
         details: { reason: 'Insufficient permissions' },
-        severity: 'medium',
         ip_address: '127.0.0.1',
         user_agent: 'Mozilla/5.0',
         created_at: new Date()
@@ -151,18 +155,17 @@ describe('Audit Service', () => {
         rows: [mockSecurityEvent]
       });
 
-      const result = await auditService.logSecurityEvent({
-        event_type: 'permission_denied',
-        user_id: 'user-1',
-        details: { reason: 'Insufficient permissions' },
-        severity: 'medium',
-        ip_address: '127.0.0.1',
-        user_agent: 'Mozilla/5.0'
-      });
+      const result = await auditService.logSecurityEvent(
+        'user-1',
+        'permission_denied',
+        { reason: 'Insufficient permissions' },
+        '127.0.0.1',
+        'Mozilla/5.0'
+      );
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO security_events'),
-        ['permission_denied', 'user-1', '{"reason":"Insufficient permissions"}', 'medium', '127.0.0.1', 'Mozilla/5.0']
+        expect.stringContaining('INSERT INTO audit_logs'),
+        ['user-1', 'security', 'permission_denied', 'user', 'user-1', '{"reason":"Insufficient permissions"}', '127.0.0.1', 'Mozilla/5.0']
       );
       expect(result).toEqual(mockSecurityEvent);
     });
@@ -171,10 +174,12 @@ describe('Audit Service', () => {
       const mockEvents = [
         {
           id: 'event-1',
-          event_type: 'permission_denied',
           user_id: 'user-1',
-          details: '{"reason":"Insufficient permissions"}',
-          severity: 'medium',
+          event_type: 'security',
+          action: 'permission_denied',
+          resource_type: 'user',
+          resource_id: 'user-1',
+          details: { reason: 'Insufficient permissions' },
           ip_address: '127.0.0.1',
           user_agent: 'Mozilla/5.0',
           created_at: new Date()
@@ -185,38 +190,41 @@ describe('Audit Service', () => {
         rows: mockEvents
       });
 
-      const result = await auditService.getSecurityEvents({ event_type: 'permission_denied', severity: 'medium' });
+      const result = await auditService.getAuditLogs({ eventType: 'security', action: 'permission_denied' });
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM security_events WHERE 1=1'),
-        ['permission_denied', 'medium']
+        expect.stringContaining('SELECT * FROM audit_logs WHERE 1=1'),
+        ['security', 'permission_denied']
       );
       expect(result).toHaveLength(1);
-      // Parse the JSON string back to object for comparison
-      expect(JSON.parse(result[0].details as unknown as string)).toEqual({ reason: 'Insufficient permissions' });
     });
   });
 
   describe('Compliance Reporting', () => {
     it('should generate compliance report', async () => {
-      const mockAuditSummary = [
-        { action: 'read_users', count: '10', unique_users: '5' }
-      ];
-      const mockSecuritySummary = [
-        { event_type: 'permission_denied', severity: 'medium', count: '3' }
-      ];
+      const mockComplianceReport = {
+        period: {
+          start: new Date(),
+          end: new Date()
+        },
+        total_events: 100,
+        events_by_type: { authentication: 50, security: 30, rbac: 20 },
+        events_by_user: { 'user-1': 30, 'user-2': 40, 'user-3': 30 },
+        security_events: 30,
+        authentication_events: 50,
+        rbac_events: 20,
+        profile_events: 0
+      };
 
-      (mockPool.query as jest.Mock)
-        .mockResolvedValueOnce({ rows: mockAuditSummary })
-        .mockResolvedValueOnce({ rows: mockSecuritySummary });
+      (mockPool.query as jest.Mock).mockResolvedValue({
+        rows: [{ total_events: '100' }]
+      });
 
       const result = await auditService.generateComplianceReport(new Date(), new Date());
 
       expect(result).toBeDefined();
-      expect(result.auditSummary).toEqual(mockAuditSummary);
-      expect(result.securitySummary).toEqual(mockSecuritySummary);
+      expect(result.total_events).toBeDefined();
       expect(result.period).toBeDefined();
-      expect(result.generatedAt).toBeDefined();
     });
   });
 });

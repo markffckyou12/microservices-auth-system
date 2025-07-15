@@ -8,8 +8,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY services/*/package*.json ./
 
-# Install all dependencies (including dev dependencies for testing)
-RUN npm ci
+# Install all dependencies
+RUN npm install
 
 # Development stage
 FROM base AS development

@@ -1,6 +1,4 @@
 /** @type {import('tailwindcss').Config} */
-import { gray } from 'tailwindcss/colors'
-
 export default {
   content: [
     "./index.html",
@@ -10,9 +8,6 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-      },
-      colors: {
-        gray,
       },
     },
   },

@@ -8,7 +8,7 @@
   }
   
   body {
-    @apply bg-gray-100 text-gray-900;
+    @apply bg-zinc-100 text-zinc-900;
   }
 }
 
@@ -18,19 +18,19 @@
   }
   
   .btn-secondary {
-    @apply bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors;
+    @apply bg-zinc-500 text-white px-4 py-2 rounded-md hover:bg-zinc-600 transition-colors;
   }
   
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-lg shadow-sm border border-zinc-200 p-6;
   }
   
   .sidebar {
-    @apply bg-white border-r border-gray-200 w-64 min-h-screen;
+    @apply bg-white border-r border-zinc-200 w-64 min-h-screen;
   }
   
   .main-content {

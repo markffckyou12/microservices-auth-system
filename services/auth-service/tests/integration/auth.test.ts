@@ -1,3 +1,19 @@
+// Move these mocks to the VERY TOP, before any imports!
+jest.mock('speakeasy', () => ({
+  generateSecret: jest.fn(() => ({
+    ascii: 'mock-secret',
+    base32: 'mock-secret-base32',
+    otpauth_url: 'otpauth://totp/MockApp:mockuser?secret=mock-secret&issuer=MockApp'
+  })),
+  totp: {
+    verify: jest.fn(() => true)
+  }
+}));
+
+jest.mock('qrcode', () => ({
+  toDataURL: jest.fn(() => Promise.resolve('mock-qr-code-data-url'))
+}));
+
 import { OAuthService } from '../../src/services/oauth';
 import { MFAService } from '../../src/services/mfa';
 import { Pool } from 'pg';
@@ -22,21 +38,6 @@ jest.mock('passport-github2', () => ({
   Strategy: jest.fn()
 }));
 
-// Mock speakeasy with proper structure
-jest.mock('speakeasy', () => ({
-  generateSecret: jest.fn(() => ({
-    ascii: 'mock-secret',
-    base32: 'mock-secret-base32',
-    otpauth_url: 'otpauth://totp/MockApp:mockuser?secret=mock-secret&issuer=MockApp'
-  })),
-  totp: {
-    verify: jest.fn(() => true)
-  }
-}));
-
-jest.mock('qrcode', () => ({
-  toDataURL: jest.fn(() => Promise.resolve('mock-qr-code-data-url'))
-}));
 
 describe('Auth Service Integration Tests', () => {
   let oauthService: OAuthService;

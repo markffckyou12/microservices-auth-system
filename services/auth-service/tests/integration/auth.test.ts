@@ -22,6 +22,7 @@ jest.mock('passport-github2', () => ({
   Strategy: jest.fn()
 }));
 
+// Mock speakeasy with proper return values
 jest.mock('speakeasy', () => ({
   generateSecret: jest.fn(() => ({
     base32: 'mock-secret-base32',
@@ -32,6 +33,7 @@ jest.mock('speakeasy', () => ({
   }
 }));
 
+// Mock QRCode
 jest.mock('qrcode', () => ({
   toDataURL: jest.fn(() => Promise.resolve('mock-qr-code-data-url'))
 }));
@@ -61,6 +63,10 @@ describe('Auth Service Integration Tests', () => {
     });
 
     it('should provide authentication methods', () => {
+      // Mock passport.authenticate to return a function
+      const passport = require('passport');
+      passport.authenticate.mockReturnValue(() => (req: any, res: any, next: any) => next());
+
       const googleAuth = oauthService.authenticate('google');
       const githubAuth = oauthService.authenticate('github');
       
@@ -69,6 +75,10 @@ describe('Auth Service Integration Tests', () => {
     });
 
     it('should provide callback authentication methods', () => {
+      // Mock passport.authenticate to return a function
+      const passport = require('passport');
+      passport.authenticate.mockReturnValue(() => (req: any, res: any, next: any) => next());
+
       const googleCallback = oauthService.authenticateCallback('google');
       const githubCallback = oauthService.authenticateCallback('github');
       
@@ -89,6 +99,9 @@ describe('Auth Service Integration Tests', () => {
     });
 
     it('should verify TOTP token', () => {
+      const speakeasy = require('speakeasy');
+      speakeasy.totp.verify.mockReturnValue(true);
+
       const isValid = mfaService.verifyTOTPToken('mock-secret', '123456');
       expect(isValid).toBe(true);
     });
@@ -191,6 +204,9 @@ describe('Auth Service Integration Tests', () => {
       expect(mockDb.query).toHaveBeenCalled();
 
       // 3. Verify TOTP token
+      const speakeasy = require('speakeasy');
+      speakeasy.totp.verify.mockReturnValue(true);
+      
       const isValidToken = mfaService.verifyTOTPToken(mfaSecret.secret, '123456');
       expect(isValidToken).toBe(true);
 

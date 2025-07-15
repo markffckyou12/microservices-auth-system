@@ -4,7 +4,7 @@ import type { AuthResponse, LoginCredentials, User, Role, AuditLog, AuditFilters
 
 // API client configuration
 const apiClient: AxiosInstance = axios.create({
-  baseURL: (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001',
+  baseURL: (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001/api/v1',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

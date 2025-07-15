@@ -264,32 +264,37 @@ describe('RBAC Service', () => {
 
   describe('getRoleWithPermissions', () => {
     it('should get role with permissions', async () => {
-      const mockRoleWithPermissions = {
+      const mockRole = {
         id: 'role-1',
         name: 'admin',
         description: 'Administrator role',
-        permissions: [
-          {
-            id: 'perm-1',
-            name: 'read_users',
-            resource: 'users',
-            action: 'read',
-            description: 'Read user data',
-            created_at: new Date()
-          }
-        ],
-        inherited_permissions: [],
         created_at: new Date(),
         updated_at: new Date()
       };
+      const mockPermissions = [
+        {
+          id: 'perm-1',
+          name: 'read_users',
+          resource: 'users',
+          action: 'read',
+          description: 'Read user data',
+          created_at: new Date()
+        }
+      ];
 
-      (mockPool.query as jest.Mock).mockResolvedValue({
-        rows: [mockRoleWithPermissions]
-      });
+      // Mock getRoleById
+      (mockPool.query as jest.Mock)
+        .mockResolvedValueOnce({ rows: [mockRole] }) // getRoleById
+        .mockResolvedValueOnce({ rows: mockPermissions }) // direct permissions
+        .mockResolvedValueOnce({ rows: [] }); // inherited permissions
 
       const result = await rbacService.getRoleWithPermissions('role-1');
 
-      expect(result).toMatchObject(mockRoleWithPermissions);
+      expect(result).toMatchObject({
+        ...mockRole,
+        permissions: mockPermissions,
+        inherited_permissions: []
+      });
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('WITH RECURSIVE role_hierarchy'),
         ['role-1']

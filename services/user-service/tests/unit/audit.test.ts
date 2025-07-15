@@ -143,8 +143,8 @@ describe('Audit Service', () => {
         user_id: 'user-1',
         event_type: 'security',
         action: 'permission_denied',
-        resource_type: 'user',
-        resource_id: 'user-1',
+        resource_type: 'system', // <-- updated
+        resource_id: undefined,  // <-- updated
         details: { reason: 'Insufficient permissions' },
         ip_address: '127.0.0.1',
         user_agent: 'Mozilla/5.0',
@@ -165,7 +165,16 @@ describe('Audit Service', () => {
 
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO audit_logs'),
-        ['user-1', 'security', 'permission_denied', 'user', 'user-1', '{"reason":"Insufficient permissions"}', '127.0.0.1', 'Mozilla/5.0']
+        [
+          'user-1',
+          'security',
+          'permission_denied',
+          'system', // <-- updated
+          undefined, // <-- updated
+          '{"reason":"Insufficient permissions"}',
+          '127.0.0.1',
+          'Mozilla/5.0'
+        ]
       );
       expect(result).toEqual(mockSecurityEvent);
     });

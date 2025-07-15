@@ -52,6 +52,7 @@ const createTestUserRouter = (db: Pool, passwordService: PasswordServiceImpl, rb
   
   // GET /users
   router.get('/', async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
     try {
       const result = await db.query('SELECT * FROM users ORDER BY created_at DESC');
       return res.json({ users: result.rows });
@@ -243,9 +244,9 @@ describe('User Service Integration Tests', () => {
     });
 
     it('should return 401 without authorization', async () => {
-      const response = await request(app)
-        .get('/users');
-
+      const appNoAuth = createTestApp(false);
+      appNoAuth.use('/users', createTestUserRouter(mockDb, passwordService, rbacService));
+      const response = await request(appNoAuth).get('/users');
       expect(response.status).toBe(401);
     });
   });

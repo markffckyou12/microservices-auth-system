@@ -412,9 +412,8 @@ describe('User Service Integration Tests', () => {
         newPassword: 'newpassword123'
       };
 
-      (mockDb.query as jest.Mock)
-        .mockResolvedValueOnce({ rows: [{ password_hash: 'mock-hash' }] }) // Get user
-        .mockResolvedValueOnce({ rowCount: 1 }); // Update password
+      // Mock the passwordService to always succeed
+      jest.spyOn(passwordService, 'changePassword').mockResolvedValue(true);
 
       const response = await request(app)
         .post('/users/user-1/password')
@@ -431,8 +430,8 @@ describe('User Service Integration Tests', () => {
         newPassword: 'newpassword123'
       };
 
-      (mockDb.query as jest.Mock)
-        .mockResolvedValueOnce({ rows: [{ password_hash: 'mock-hash' }] }); // Get user
+      // Mock the passwordService to fail
+      jest.spyOn(passwordService, 'changePassword').mockResolvedValue(false);
 
       const response = await request(app)
         .post('/users/user-1/password')

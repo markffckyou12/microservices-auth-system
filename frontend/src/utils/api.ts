@@ -4,7 +4,7 @@ import type { AuthResponse, LoginCredentials, User, Role, AuditLog, AuditFilters
 
 // API client configuration
 const apiClient: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3003',
+  baseURL: (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3003',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -13,20 +13,20 @@ const apiClient: AxiosInstance = axios.create({
 
 // Request interceptor for authentication
 apiClient.interceptors.request.use(
-  (config) => {
+  (config: any) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error: any) => Promise.reject(error)
 );
 
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error) => {
+  (error: any) => {
     if (error.response?.status === 401) {
       // Handle unauthorized access
       localStorage.removeItem('token');

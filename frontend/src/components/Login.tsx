@@ -38,7 +38,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="card w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">RBAC Admin</h1>

@@ -59,7 +59,7 @@ const Dashboard: React.FC = () => {
             <div className="space-y-2">
               {roles.length > 0 ? (
                 roles.map((role) => (
-                  <div key={role.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+                  <div key={role.id} className="flex items-center justify-between p-3 bg-gray-100 rounded-md">
                     <div>
                       <p className="font-medium text-gray-900">{role.name}</p>
                       {role.description && (

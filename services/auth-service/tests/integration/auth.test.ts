@@ -22,8 +22,8 @@ jest.mock('passport-github2', () => ({
   Strategy: jest.fn()
 }));
 
-// Mock speakeasy properly
-const mockSpeakeasy = {
+// Mock speakeasy inline to avoid hoisting issues
+jest.mock('speakeasy', () => ({
   generateSecret: jest.fn(() => ({
     base32: 'mock-secret-base32',
     otpauth_url: 'otpauth://totp/Auth%20System%20(test%40example.com)?secret=mock-secret&issuer=Auth%20System'
@@ -31,9 +31,7 @@ const mockSpeakeasy = {
   totp: {
     verify: jest.fn(() => true)
   }
-};
-
-jest.mock('speakeasy', () => mockSpeakeasy);
+}));
 
 // Mock QRCode
 jest.mock('qrcode', () => ({
@@ -91,12 +89,6 @@ describe('Auth Service Integration Tests', () => {
 
   describe('MFA Service', () => {
     it('should generate TOTP secret successfully', async () => {
-      // Reset the mock to ensure it returns the expected structure
-      mockSpeakeasy.generateSecret.mockReturnValue({
-        base32: 'mock-secret-base32',
-        otpauth_url: 'otpauth://totp/Auth%20System%20(test%40example.com)?secret=mock-secret&issuer=Auth%20System'
-      });
-
       const result = await mfaService.generateTOTPSecret('user-1', 'test@example.com');
       
       expect(result).toHaveProperty('secret');
@@ -107,8 +99,6 @@ describe('Auth Service Integration Tests', () => {
     });
 
     it('should verify TOTP token', () => {
-      mockSpeakeasy.totp.verify.mockReturnValue(true);
-
       const isValid = mfaService.verifyTOTPToken('mock-secret', '123456');
       expect(isValid).toBe(true);
     });
@@ -199,12 +189,6 @@ describe('Auth Service Integration Tests', () => {
 
   describe('Service Integration', () => {
     it('should work together for MFA setup flow', async () => {
-      // Reset the mock to ensure it returns the expected structure
-      mockSpeakeasy.generateSecret.mockReturnValue({
-        base32: 'mock-secret-base32',
-        otpauth_url: 'otpauth://totp/Auth%20System%20(test%40example.com)?secret=mock-secret&issuer=Auth%20System'
-      });
-
       // 1. Generate TOTP secret
       const mfaSecret = await mfaService.generateTOTPSecret('user-1', 'test@example.com');
       expect(mfaSecret.secret).toBeDefined();
@@ -218,8 +202,6 @@ describe('Auth Service Integration Tests', () => {
       expect(mockDb.query).toHaveBeenCalled();
 
       // 3. Verify TOTP token
-      mockSpeakeasy.totp.verify.mockReturnValue(true);
-      
       const isValidToken = mfaService.verifyTOTPToken(mfaSecret.secret, '123456');
       expect(isValidToken).toBe(true);
 

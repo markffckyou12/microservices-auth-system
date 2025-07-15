@@ -40,13 +40,21 @@ import { Pool } from 'pg';
 
 
 describe('Auth Service Integration Tests', () => {
-  let oauthService: OAuthService;
-  let mfaService: MFAService;
-  let mockDb: jest.Mocked<Pool>;
+  let OAuthService: any;
+  let MFAService: any;
+  let Pool: any;
+  let oauthService: any;
+  let mfaService: any;
+  let mockDb: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockDb = new Pool() as jest.Mocked<Pool>;
+    jest.resetModules(); // <--- This is important!
+    // Re-require after mocks are set up
+    OAuthService = require('../../src/services/oauth').OAuthService;
+    MFAService = require('../../src/services/mfa').MFAService;
+    Pool = require('pg').Pool;
+
+    mockDb = new Pool();
     oauthService = OAuthService.getInstance();
     mfaService = new MFAService(mockDb);
   });

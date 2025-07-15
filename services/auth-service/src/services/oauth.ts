@@ -35,22 +35,26 @@ export class OAuthService {
   }
 
   private initializeStrategies(): void {
-    // Google OAuth Strategy
-    passport.use(new GoogleStrategy({
-      clientID: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3001/auth/google/callback',
-      scope: ['profile', 'email'],
-      passReqToCallback: true
-    }, this.handleGoogleCallback.bind(this)));
+    // Google OAuth Strategy - only initialize if credentials are provided
+    if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+      passport.use(new GoogleStrategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3001/auth/google/callback',
+        scope: ['profile', 'email'],
+        passReqToCallback: true
+      }, this.handleGoogleCallback.bind(this)));
+    }
 
-    // GitHub OAuth Strategy
-    passport.use(new GitHubStrategy({
-      clientID: process.env.GITHUB_CLIENT_ID || '',
-      clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
-      callbackURL: process.env.GITHUB_CALLBACK_URL || 'http://localhost:3001/auth/github/callback',
-      scope: ['user:email']
-    }, this.handleGitHubCallback.bind(this)));
+    // GitHub OAuth Strategy - only initialize if credentials are provided
+    if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+      passport.use(new GitHubStrategy({
+        clientID: process.env.GITHUB_CLIENT_ID,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET,
+        callbackURL: process.env.GITHUB_CALLBACK_URL || 'http://localhost:3001/auth/github/callback',
+        scope: ['user:email']
+      }, this.handleGitHubCallback.bind(this)));
+    }
   }
 
   // Update Google callback signature to match StrategyOptionsWithRequest

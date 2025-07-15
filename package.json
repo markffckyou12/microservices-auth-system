@@ -41,7 +41,8 @@
     "lint:user": "cd services/user-service && npm run lint",
     "lint:session": "cd services/session-service && npm run lint",
     "format": "prettier --write \"services/**/*.{js,ts,json,md}\"",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "dev:gateway": "echo 'API Gateway not implemented yet' && exit 0"
   },
   "keywords": [
     "microservices",

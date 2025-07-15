@@ -42,10 +42,11 @@ services:
       DATABASE_URL: postgresql://auth_user:auth_password@postgres:5432/auth_system
       REDIS_URL: redis://redis:6379
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      OAUTH_GOOGLE_CLIENT_ID: your-google-client-id
-      OAUTH_GOOGLE_CLIENT_SECRET: your-google-client-secret
-      OAUTH_GITHUB_CLIENT_ID: your-github-client-id
-      OAUTH_GITHUB_CLIENT_SECRET: your-github-client-secret
+      # OAuth - make these optional
+      GOOGLE_CLIENT_ID: ""
+      GOOGLE_CLIENT_SECRET: ""
+      GITHUB_CLIENT_ID: ""
+      GITHUB_CLIENT_SECRET: ""
     ports:
       - "3001:3001"
     depends_on:
@@ -106,27 +107,27 @@ services:
       - /app/services/session-service/node_modules
 
   # API Gateway (Optional - for production)
-  api-gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: development
-    container_name: api-gateway
-    command: ["npm", "run", "dev:gateway"]
-    environment:
-      NODE_ENV: development
-      PORT: 3000
-      AUTH_SERVICE_URL: http://auth-service:3001
-      USER_SERVICE_URL: http://user-service:3003
-      SESSION_SERVICE_URL: http://session-service:3002
-    ports:
-      - "3000:3000"
-    depends_on:
-      - auth-service
-      - user-service
-      - session-service
-    networks:
-      - auth-network
+  # api-gateway:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     target: development
+  #   container_name: api-gateway
+  #   command: ["npm", "run", "dev:gateway"]
+  #   environment:
+  #     NODE_ENV: development
+  #     PORT: 3000
+  #     AUTH_SERVICE_URL: http://auth-service:3001
+  #     USER_SERVICE_URL: http://user-service:3003
+  #     SESSION_SERVICE_URL: http://session-service:3002
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - auth-service
+  #     - user-service
+  #     - session-service
+  #   networks:
+  #     - auth-network
 
 volumes:
   postgres_data:

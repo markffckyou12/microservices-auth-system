@@ -1,37 +1,37 @@
 import { Pool } from 'pg';
 export interface PasswordResetToken {
-    userId: string;
+    id: string;
+    user_id: string;
     token: string;
-    expiresAt: Date;
+    expires_at: Date;
     used: boolean;
+    created_at: Date;
 }
-export interface PasswordHistory {
-    userId: string;
-    passwordHash: string;
-    createdAt: Date;
-}
-export interface PasswordStrength {
-    score: number;
-    feedback: string[];
-    isStrong: boolean;
-}
-export declare class PasswordService {
-    private db;
-    private emailTransporter;
-    constructor(db: Pool);
-    validatePasswordStrength(password: string): PasswordStrength;
-    checkPasswordHistory(userId: string, password: string): Promise<boolean>;
-    addToPasswordHistory(userId: string, passwordHash: string): Promise<void>;
+export interface PasswordService {
+    requestPasswordReset(email: string): Promise<boolean>;
+    resetPassword(token: string, newPassword: string): Promise<boolean>;
+    changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean>;
+    validatePasswordStrength(password: string): {
+        isValid: boolean;
+        errors: string[];
+    };
+    checkPasswordHistory(userId: string, newPassword: string): Promise<boolean>;
+    sendPasswordResetEmail(email: string, token: string): Promise<void>;
     generatePasswordResetToken(userId: string): Promise<string>;
-    verifyPasswordResetToken(token: string): Promise<string | null>;
-    markPasswordResetTokenUsed(token: string): Promise<void>;
-    sendPasswordResetEmail(email: string, resetUrl: string): Promise<void>;
-    checkAccountLockout(userId: string): Promise<{
-        isLocked: boolean;
-        remainingTime?: number;
-    }>;
-    incrementFailedAttempts(userId: string): Promise<void>;
-    resetFailedAttempts(userId: string): Promise<void>;
 }
-export default PasswordService;
+export declare class PasswordServiceImpl implements PasswordService {
+    private db;
+    constructor(db: Pool);
+    requestPasswordReset(email: string): Promise<boolean>;
+    resetPassword(token: string, newPassword: string): Promise<boolean>;
+    changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean>;
+    validatePasswordStrength(password: string): {
+        isValid: boolean;
+        errors: string[];
+    };
+    checkPasswordHistory(userId: string, newPassword: string): Promise<boolean>;
+    sendPasswordResetEmail(email: string, token: string): Promise<void>;
+    generatePasswordResetToken(userId: string): Promise<string>;
+    private generateResetToken;
+}
 //# sourceMappingURL=password.d.ts.map

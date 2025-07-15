@@ -73,10 +73,11 @@ export class AuthorizationMiddleware {
 
         // Log the action if requested
         if (logAction) {
-          await this.auditService.logAction({
+          await this.auditService.logEvent({
             user_id: req.user.id,
+            event_type: 'authorization',
             action: `${action}_${resource}`,
-            resource,
+            resource_type: resource,
             resource_id: req.params.id,
             details: {
               method: req.method,
@@ -252,9 +253,11 @@ export class AuthorizationMiddleware {
 
   private async logSecurityEvent(req: AuthenticatedRequest, eventType: string, details: Record<string, any>) {
     try {
-      await this.auditService.logSecurityEvent({
-        event_type: eventType as any,
+      await this.auditService.logEvent({
         user_id: req.user?.id,
+        event_type: 'security',
+        action: eventType,
+        resource_type: 'system',
         details: {
           ...details,
           method: req.method,
@@ -262,7 +265,6 @@ export class AuthorizationMiddleware {
           ip_address: req.ip,
           user_agent: req.get('User-Agent')
         },
-        severity: 'medium',
         ip_address: req.ip,
         user_agent: req.get('User-Agent')
       });

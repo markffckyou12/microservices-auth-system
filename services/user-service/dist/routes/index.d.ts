@@ -1,4 +1,4 @@
-import { Express } from 'express';
+import { Router } from 'express';
 import { Pool } from 'pg';
-export declare const setupRoutes: (app: Express, db: Pool) => void;
+export declare function setupRoutes(db: Pool): Router;
 //# sourceMappingURL=index.d.ts.map

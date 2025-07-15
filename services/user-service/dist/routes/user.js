@@ -1,11 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = createUserRoutes;
+exports.setupUserRoutes = setupUserRoutes;
 const express_1 = require("express");
 const express_validator_1 = require("express-validator");
-function createUserRoutes(db) {
+function setupUserRoutes(db, authMiddleware) {
     const router = (0, express_1.Router)();
-    router.get('/profile', async (req, res) => {
+    const requireOwnershipOrPermission = authMiddleware
+        ? authMiddleware.requireOwnershipOrPermission.bind(authMiddleware)
+        : () => (req, res, next) => next();
+    router.get('/profile', requireOwnershipOrPermission('users', 'read'), async (req, res) => {
         try {
             const userId = req.user?.id;
             if (!userId) {
@@ -26,7 +29,7 @@ function createUserRoutes(db) {
         (0, express_validator_1.body)('firstName').optional().isLength({ min: 1, max: 50 }),
         (0, express_validator_1.body)('lastName').optional().isLength({ min: 1, max: 50 }),
         (0, express_validator_1.body)('username').optional().isLength({ min: 3, max: 30 })
-    ], async (req, res) => {
+    ], requireOwnershipOrPermission('users', 'update'), async (req, res) => {
         try {
             const userId = req.user?.id;
             if (!userId) {
@@ -64,7 +67,7 @@ function createUserRoutes(db) {
             return res.status(500).json({ success: false, message: 'Internal server error' });
         }
     });
-    router.delete('/account', async (req, res) => {
+    router.delete('/account', requireOwnershipOrPermission('users', 'delete'), async (req, res) => {
         try {
             const userId = req.user?.id;
             if (!userId) {
@@ -80,4 +83,5 @@ function createUserRoutes(db) {
     });
     return router;
 }
+exports.default = setupUserRoutes;
 //# sourceMappingURL=user.js.map

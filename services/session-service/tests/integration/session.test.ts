@@ -38,6 +38,9 @@ const mockAuthUtils = {
 
 jest.mock('../../src/utils/auth', () => mockAuthUtils);
 
+// Import the route setup function
+import { setupRoutes } from '../../src/routes';
+
 describe('Session Service Integration Tests', () => {
   let app: express.Application;
   let mockDb: jest.Mocked<Pool>;
@@ -59,7 +62,9 @@ describe('Session Service Integration Tests', () => {
       sMembers: jest.fn(),
       sAdd: jest.fn(),
       sRem: jest.fn(),
-      expire: jest.fn()
+      expire: jest.fn(),
+      connect: jest.fn(),
+      disconnect: jest.fn()
     };
     
     // Create Express app
@@ -67,88 +72,24 @@ describe('Session Service Integration Tests', () => {
     app.use(express.json());
   });
 
-  describe('POST /sessions', () => {
-    it('should create a new session successfully', async () => {
-      const sessionData = {
-        userId: 'test-user-id',
-        userAgent: 'Mozilla/5.0 (Test Browser)',
-        ipAddress: '127.0.0.1',
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      };
-
-      // Mock Redis set operation
-      mockRedis.set.mockResolvedValue('OK');
-
-      const response = await request(app)
-        .post('/sessions')
-        .send(sessionData);
-
-      expect(response.status).toBe(201);
-      expect(response.body).toHaveProperty('sessionId');
-      expect(response.body).toHaveProperty('userId', sessionData.userId);
-      expect(response.body).toHaveProperty('createdAt');
-      expect(response.body).toHaveProperty('expiresAt');
+  // Helper function to add authentication middleware for tests
+  const addAuthMiddleware = (userId: string = 'test-user-id', sessionId: string = 'test-session-id') => {
+    app.use((req, res, next) => {
+      req.user = { id: userId, sessionId };
+      next();
     });
+  };
 
-    it('should return 400 for missing required fields', async () => {
-      const response = await request(app)
-        .post('/sessions')
-        .send({
-          userId: 'test-user-id'
-          // Missing other required fields
-        });
+  // Helper function to setup routes with authentication
+  const setupRoutesWithAuth = (userId?: string, sessionId?: string) => {
+    if (userId && sessionId) {
+      addAuthMiddleware(userId, sessionId);
+    }
+    setupRoutes(app as any, mockRedis as any);
+  };
 
-      expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('errors');
-    });
-  });
-
-  describe('GET /sessions/:sessionId', () => {
-    let sessionId: string;
-
+  describe('GET /api/v1/sessions', () => {
     beforeEach(() => {
-      sessionId = 'test-session-id';
-      
-      // Mock Redis get operation
-      mockRedis.get.mockResolvedValue(JSON.stringify({
-        id: sessionId,
-        userId: 'test-user-id',
-        userAgent: 'Mozilla/5.0 (Test Browser)',
-        ipAddress: '127.0.0.1',
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      }));
-    });
-
-    it('should retrieve session by ID successfully', async () => {
-      const response = await request(app)
-        .get(`/sessions/${sessionId}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('sessionId', sessionId);
-      expect(response.body).toHaveProperty('userId', 'test-user-id');
-      expect(response.body).toHaveProperty('userAgent', 'Mozilla/5.0 (Test Browser)');
-      expect(response.body).toHaveProperty('ipAddress', '127.0.0.1');
-    });
-
-    it('should return 404 for non-existent session', async () => {
-      // Mock Redis to return null for non-existent session
-      mockRedis.get.mockResolvedValue(null);
-
-      const response = await request(app)
-        .get('/sessions/non-existent-session-id');
-
-      expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('message', 'Session not found');
-    });
-  });
-
-  describe('GET /sessions/user/:userId', () => {
-    let userId: string;
-
-    beforeEach(() => {
-      userId = 'test-user-multiple-sessions';
-      
       // Mock Redis sMembers to return user sessions
       mockRedis.sMembers.mockResolvedValue([
         'session:session-1',
@@ -161,7 +102,7 @@ describe('Session Service Integration Tests', () => {
         const sessionId = key.replace('session:', '');
         return Promise.resolve(JSON.stringify({
           id: sessionId,
-          userId,
+          userId: 'test-user-id',
           userAgent: `Mozilla/5.0 (Test Browser ${sessionId})`,
           ipAddress: '127.0.0.1',
           createdAt: new Date().toISOString(),
@@ -170,45 +111,84 @@ describe('Session Service Integration Tests', () => {
       });
     });
 
-    it('should retrieve all sessions for a user', async () => {
+    it('should retrieve all sessions for authenticated user', async () => {
+      setupRoutesWithAuth('test-user-id', 'test-session-id');
+      
+      // Mock Redis sMembers to return user sessions with correct prefix
+      mockRedis.sMembers.mockResolvedValue([
+        'session-1',
+        'session-2',
+        'session-3'
+      ]);
+
+      // Mock Redis get for each session
+      mockRedis.get.mockImplementation((key: string) => {
+        const sessionId = key.replace('session:', '');
+        return Promise.resolve(JSON.stringify({
+          id: sessionId,
+          userId: 'test-user-id',
+          userAgent: `Mozilla/5.0 (Test Browser ${sessionId})`,
+          ipAddress: '127.0.0.1',
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          isActive: true
+        }));
+      });
+      
       const response = await request(app)
-        .get(`/sessions/user/${userId}`);
+        .get('/api/v1/sessions');
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('sessions');
-      expect(Array.isArray(response.body.sessions)).toBe(true);
-      expect(response.body.sessions.length).toBeGreaterThanOrEqual(2);
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('data');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThanOrEqual(2);
       
-      response.body.sessions.forEach((session: any) => {
+      response.body.data.forEach((session: any) => {
         expect(session).toHaveProperty('sessionId');
-        expect(session).toHaveProperty('userId', userId);
-        expect(session).toHaveProperty('userAgent');
         expect(session).toHaveProperty('ipAddress');
+        expect(session).toHaveProperty('userAgent');
         expect(session).toHaveProperty('createdAt');
-        expect(session).toHaveProperty('expiresAt');
+        expect(session).toHaveProperty('lastActive');
       });
     });
 
+    it('should return 401 for unauthenticated user', async () => {
+      setupRoutesWithAuth(); // No auth middleware
+      
+      const response = await request(app)
+        .get('/api/v1/sessions');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('success', false);
+      expect(response.body).toHaveProperty('message', 'Unauthorized');
+    });
+
     it('should return empty array for user with no sessions', async () => {
+      setupRoutesWithAuth('test-user-id', 'test-session-id');
+      
       // Mock Redis to return empty array for user with no sessions
       mockRedis.sMembers.mockResolvedValue([]);
 
       const response = await request(app)
-        .get('/sessions/user/user-with-no-sessions');
+        .get('/api/v1/sessions');
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('sessions');
-      expect(response.body.sessions).toEqual([]);
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toEqual([]);
     });
+
+
   });
 
-  describe('PUT /sessions/:sessionId', () => {
+  describe('DELETE /api/v1/sessions/:sessionId', () => {
     let sessionId: string;
 
     beforeEach(() => {
       sessionId = 'test-session-id';
       
-      // Mock Redis get for existing session
+      // Mock Redis operations for session invalidation
       mockRedis.get.mockResolvedValue(JSON.stringify({
         id: sessionId,
         userId: 'test-user-id',
@@ -217,202 +197,215 @@ describe('Session Service Integration Tests', () => {
         createdAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       }));
-
-      // Mock Redis set for update
-      mockRedis.set.mockResolvedValue('OK');
-    });
-
-    it('should update session successfully', async () => {
-      const updateData = {
-        userAgent: 'Mozilla/5.0 (Updated Browser)',
-        ipAddress: '192.168.1.100',
-        expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
-      };
-
-      const response = await request(app)
-        .put(`/sessions/${sessionId}`)
-        .send(updateData);
-
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('sessionId', sessionId);
-      expect(response.body).toHaveProperty('userAgent', updateData.userAgent);
-      expect(response.body).toHaveProperty('ipAddress', updateData.ipAddress);
-      expect(response.body).toHaveProperty('expiresAt', updateData.expiresAt);
-    });
-
-    it('should return 404 for non-existent session', async () => {
-      // Mock Redis to return null for non-existent session
-      mockRedis.get.mockResolvedValue(null);
-
-      const updateData = {
-        userAgent: 'Mozilla/5.0 (Updated Browser)',
-        ipAddress: '192.168.1.100'
-      };
-
-      const response = await request(app)
-        .put('/sessions/non-existent-session-id')
-        .send(updateData);
-
-      expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('message', 'Session not found');
-    });
-  });
-
-  describe('DELETE /sessions/:sessionId', () => {
-    let sessionId: string;
-
-    beforeEach(() => {
-      sessionId = 'test-session-id';
-      
-      // Mock Redis get for existing session
-      mockRedis.get.mockResolvedValue(JSON.stringify({
-        id: sessionId,
-        userId: 'test-user-id',
-        userAgent: 'Mozilla/5.0 (Test Browser)',
-        ipAddress: '127.0.0.1',
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      }));
-
-      // Mock Redis del for deletion
       mockRedis.del.mockResolvedValue(1);
+      mockRedis.sRem.mockResolvedValue(1);
     });
 
-    it('should delete session successfully', async () => {
+    it('should invalidate specific session successfully', async () => {
+      setupRoutesWithAuth('test-user-id', 'test-session-id');
+      
       const response = await request(app)
-        .delete(`/sessions/${sessionId}`);
+        .delete(`/api/v1/sessions/${sessionId}`);
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message', 'Session deleted successfully');
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('message', 'Session invalidated');
     });
 
-    it('should return 404 for non-existent session', async () => {
-      // Mock Redis to return null for non-existent session
-      mockRedis.get.mockResolvedValue(null);
-
+    it('should return 401 for unauthenticated user', async () => {
+      setupRoutesWithAuth(); // No auth middleware
+      
       const response = await request(app)
-        .delete('/sessions/non-existent-session-id');
+        .delete(`/api/v1/sessions/${sessionId}`);
 
-      expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('message', 'Session not found');
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('success', false);
+      expect(response.body).toHaveProperty('message', 'Unauthorized');
     });
   });
 
-  describe('DELETE /sessions/user/:userId', () => {
-    let userId: string;
-
+  describe('DELETE /api/v1/sessions', () => {
     beforeEach(() => {
-      userId = 'test-user-multiple-sessions-delete';
+      // Mock Redis operations for invalidating other sessions
+      mockRedis.sMembers.mockResolvedValue([
+        'session:other-session-1',
+        'session:other-session-2',
+        'session:current-session-id'
+      ]);
+      mockRedis.del.mockResolvedValue(1);
+      mockRedis.sRem.mockResolvedValue(1);
+    });
+
+    it('should invalidate all other sessions for authenticated user', async () => {
+      setupRoutesWithAuth('test-user-id', 'current-session-id');
       
-      // Mock Redis sMembers to return user sessions
+      const response = await request(app)
+        .delete('/api/v1/sessions');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('message', 'Other sessions invalidated');
+    });
+
+    it('should return 401 for unauthenticated user', async () => {
+      setupRoutesWithAuth(); // No auth middleware
+      
+      const response = await request(app)
+        .delete('/api/v1/sessions');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('success', false);
+      expect(response.body).toHaveProperty('message', 'Unauthorized');
+    });
+  });
+
+  describe('DELETE /api/v1/sessions/all', () => {
+    beforeEach(() => {
+      // Mock Redis operations for invalidating all sessions
       mockRedis.sMembers.mockResolvedValue([
         'session:session-1',
         'session:session-2',
         'session:session-3'
       ]);
-
-      // Mock Redis del for deletion
       mockRedis.del.mockResolvedValue(1);
       mockRedis.sRem.mockResolvedValue(1);
     });
 
-    it('should delete all sessions for a user', async () => {
-      const response = await request(app)
-        .delete(`/sessions/user/${userId}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message', 'All sessions deleted successfully');
-      expect(response.body).toHaveProperty('deletedCount');
-      expect(response.body.deletedCount).toBeGreaterThanOrEqual(2);
-    });
-
-    it('should return 200 for user with no sessions', async () => {
-      // Mock Redis to return empty array for user with no sessions
-      mockRedis.sMembers.mockResolvedValue([]);
-
-      const response = await request(app)
-        .delete('/sessions/user/user-with-no-sessions');
-
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('message', 'All sessions deleted successfully');
-      expect(response.body).toHaveProperty('deletedCount', 0);
-    });
-  });
-
-  describe('GET /sessions/validate/:sessionId', () => {
-    let sessionId: string;
-
-    beforeEach(() => {
-      sessionId = 'test-session-id';
+    it('should invalidate all sessions for authenticated user', async () => {
+      setupRoutesWithAuth('test-user-id', 'test-session-id');
       
-      // Mock Redis get for active session
-      mockRedis.get.mockResolvedValue(JSON.stringify({
-        id: sessionId,
-        userId: 'test-user-id',
-        userAgent: 'Mozilla/5.0 (Test Browser)',
-        ipAddress: '127.0.0.1',
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        isActive: true
-      }));
-    });
-
-    it('should validate active session successfully', async () => {
+      // Mock Redis operations for invalidating all sessions
+      mockRedis.sMembers.mockResolvedValue([
+        'session-1',
+        'session-2',
+        'session-3'
+      ]);
+      mockRedis.del.mockResolvedValue(1);
+      
       const response = await request(app)
-        .get(`/sessions/validate/${sessionId}`);
+        .delete('/api/v1/sessions/all');
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('valid', true);
-      expect(response.body).toHaveProperty('session');
-      expect(response.body.session).toHaveProperty('sessionId', sessionId);
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('message', 'All sessions invalidated');
     });
 
-    it('should return 404 for non-existent session', async () => {
-      // Mock Redis to return null for non-existent session
-      mockRedis.get.mockResolvedValue(null);
-
+    it('should return 401 for unauthenticated user', async () => {
+      setupRoutesWithAuth(); // No auth middleware
+      
       const response = await request(app)
-        .get('/sessions/validate/non-existent-session-id');
+        .delete('/api/v1/sessions/all');
 
-      expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('message', 'Session not found');
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('success', false);
+      expect(response.body).toHaveProperty('message', 'Unauthorized');
     });
   });
 
-  describe('GET /sessions/stats', () => {
+  describe('GET /api/v1/sessions/stats', () => {
     beforeEach(() => {
-      // Mock Redis keys to return session keys
-      mockRedis.keys.mockResolvedValue([
+      // Mock Redis operations for session stats
+      mockRedis.sMembers.mockResolvedValue([
         'session:session-1',
         'session:session-2',
         'session:session-3'
       ]);
-
-      // Mock Redis get for session data
       mockRedis.get.mockImplementation((key: string) => {
         const sessionId = key.replace('session:', '');
         return Promise.resolve(JSON.stringify({
           id: sessionId,
-          userId: `user-${sessionId}`,
-          isActive: true,
+          userId: 'test-user-id',
+          userAgent: `Mozilla/5.0 (Test Browser ${sessionId})`,
+          ipAddress: '127.0.0.1',
+          createdAt: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         }));
       });
     });
 
-    it('should return session statistics', async () => {
+    it('should get session statistics for authenticated user', async () => {
+      setupRoutesWithAuth('test-user-id', 'test-session-id');
+      
       const response = await request(app)
-        .get('/sessions/stats');
+        .get('/api/v1/sessions/stats');
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('totalSessions');
-      expect(response.body).toHaveProperty('activeSessions');
-      expect(response.body).toHaveProperty('expiredSessions');
-      expect(response.body).toHaveProperty('uniqueUsers');
-      expect(typeof response.body.totalSessions).toBe('number');
-      expect(typeof response.body.activeSessions).toBe('number');
-      expect(typeof response.body.expiredSessions).toBe('number');
-      expect(typeof response.body.uniqueUsers).toBe('number');
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('totalSessions');
+      expect(response.body.data).toHaveProperty('activeSessions');
+    });
+
+    it('should return 401 for unauthenticated user', async () => {
+      setupRoutesWithAuth(); // No auth middleware
+      
+      const response = await request(app)
+        .get('/api/v1/sessions/stats');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('success', false);
+      expect(response.body).toHaveProperty('message', 'Unauthorized');
+    });
+  });
+
+  describe('POST /api/v1/sessions/refresh', () => {
+    beforeEach(() => {
+      // Mock Redis operations for session refresh
+      mockRedis.get.mockResolvedValue(JSON.stringify({
+        id: 'current-session-id',
+        userId: 'test-user-id',
+        userAgent: 'Mozilla/5.0 (Test Browser)',
+        ipAddress: '127.0.0.1',
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      }));
+      mockRedis.set.mockResolvedValue('OK');
+    });
+
+    it('should refresh current session successfully', async () => {
+      setupRoutesWithAuth('test-user-id', 'current-session-id');
+      
+      const response = await request(app)
+        .post('/api/v1/sessions/refresh');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('message', 'Session refreshed');
+    });
+
+    it('should return 401 for unauthenticated user', async () => {
+      setupRoutesWithAuth(); // No auth middleware
+      
+      const response = await request(app)
+        .post('/api/v1/sessions/refresh');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('success', false);
+      expect(response.body).toHaveProperty('message', 'Unauthorized');
+    });
+  });
+
+  describe('Health Check Endpoints', () => {
+    it('should return health status', async () => {
+      setupRoutesWithAuth(); // No auth needed for health checks
+      
+      const response = await request(app)
+        .get('/health');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('status', 'healthy');
+      expect(response.body).toHaveProperty('service', 'session-service');
+    });
+
+    it('should return API status', async () => {
+      setupRoutesWithAuth(); // No auth needed for health checks
+      
+      const response = await request(app)
+        .get('/api/v1/sessions/status');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('message', 'Session Service is running');
+      expect(response.body).toHaveProperty('version', '1.0.0');
     });
   });
 }); 

@@ -8,12 +8,11 @@ WORKDIR /app
 COPY package*.json ./
 COPY services/*/package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including dev dependencies for testing)
+RUN npm ci
 
 # Development stage
 FROM base AS development
-RUN npm ci
 COPY . .
 EXPOSE 3001 3002 3003
 
@@ -24,4 +23,4 @@ RUN npm run build
 EXPOSE 3001 3002 3003
 
 # Default to development
-CMD ["npm", "run", "dev"] 
+CMD ["npm", "run", "dev"]

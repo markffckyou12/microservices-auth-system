@@ -1,4 +1,4 @@
-// Move these mocks to the VERY TOP, before any imports!
+// ALL MOCKS FIRST, BEFORE ANY IMPORTS!
 jest.mock('speakeasy', () => ({
   generateSecret: jest.fn(() => ({
     ascii: 'mock-secret',
@@ -14,11 +14,6 @@ jest.mock('qrcode', () => ({
   toDataURL: jest.fn(() => Promise.resolve('mock-qr-code-data-url'))
 }));
 
-import { OAuthService } from '../../src/services/oauth';
-import { MFAService } from '../../src/services/mfa';
-import { Pool } from 'pg';
-
-// Mock dependencies
 jest.mock('pg', () => ({
   Pool: jest.fn(() => ({
     query: jest.fn()
@@ -37,6 +32,11 @@ jest.mock('passport-google-oauth20', () => ({
 jest.mock('passport-github2', () => ({
   Strategy: jest.fn()
 }));
+
+// NOW IMPORTS
+import { OAuthService } from '../../src/services/oauth';
+import { MFAService } from '../../src/services/mfa';
+import { Pool } from 'pg';
 
 
 describe('Auth Service Integration Tests', () => {

@@ -1,4 +1,5 @@
-import { AuthService } from '../../src/services/auth';
+import { OAuthService } from '../../src/services/oauth';
+import { MFAService } from '../../src/services/mfa';
 import { Pool } from 'pg';
 
 // Mock dependencies
@@ -8,132 +9,202 @@ jest.mock('pg', () => ({
   }))
 }));
 
-jest.mock('bcrypt', () => ({
-  hash: jest.fn(() => 'mock-hashed-password'),
-  compare: jest.fn(() => true)
+jest.mock('passport', () => ({
+  use: jest.fn(),
+  authenticate: jest.fn(() => (req: any, res: any, next: any) => next())
 }));
 
-jest.mock('jsonwebtoken', () => ({
-  sign: jest.fn(() => 'mock-jwt-token'),
-  verify: jest.fn(() => ({ userId: 'mock-user-id' }))
+jest.mock('passport-google-oauth20', () => ({
+  Strategy: jest.fn()
+}));
+
+jest.mock('passport-github2', () => ({
+  Strategy: jest.fn()
+}));
+
+jest.mock('speakeasy', () => ({
+  generateSecret: jest.fn(() => ({
+    base32: 'mock-secret-base32',
+    otpauth_url: 'otpauth://totp/Auth%20System%20(test%40example.com)?secret=mock-secret&issuer=Auth%20System'
+  })),
+  totp: {
+    verify: jest.fn(() => true)
+  }
+}));
+
+jest.mock('qrcode', () => ({
+  toDataURL: jest.fn(() => Promise.resolve('mock-qr-code-data-url'))
 }));
 
 describe('Auth Service Integration Tests', () => {
-  let authService: AuthService;
+  let oauthService: OAuthService;
+  let mfaService: MFAService;
   let mockDb: jest.Mocked<Pool>;
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockDb = new Pool() as jest.Mocked<Pool>;
-    authService = new AuthService(mockDb);
+    oauthService = OAuthService.getInstance();
+    mfaService = new MFAService(mockDb);
   });
 
-  describe('User Registration', () => {
-    it('should register a new user successfully', async () => {
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [] }) // Check if user exists
-        .mockResolvedValueOnce({ 
-          rows: [{ 
-            id: 'new-user-id', 
-            email: 'test@example.com', 
-            first_name: 'Test',
-            last_name: 'User',
-            created_at: new Date()
-          }] 
-        }); // User created
-
-      mockDb.query = mockQuery;
-
-      const result = await authService.registerUser({
-        email: 'test@example.com',
-        password: 'password123',
-        firstName: 'Test',
-        lastName: 'User'
-      });
-
-      expect(result).toHaveProperty('user');
-      expect(result.user).toHaveProperty('id');
-      expect(result.user).toHaveProperty('email', 'test@example.com');
+  describe('OAuth Service', () => {
+    it('should be a singleton instance', () => {
+      const instance1 = OAuthService.getInstance();
+      const instance2 = OAuthService.getInstance();
+      expect(instance1).toBe(instance2);
     });
 
-    it('should throw error for duplicate email', async () => {
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ 
-          rows: [{ id: 'existing-user-id', email: 'duplicate@example.com' }] 
-        });
+    it('should initialize passport strategies', () => {
+      expect(oauthService).toBeDefined();
+      expect(oauthService.getPassport).toBeDefined();
+    });
 
-      mockDb.query = mockQuery;
+    it('should provide authentication methods', () => {
+      const googleAuth = oauthService.authenticate('google');
+      const githubAuth = oauthService.authenticate('github');
+      
+      expect(googleAuth).toBeDefined();
+      expect(githubAuth).toBeDefined();
+    });
 
-      await expect(authService.registerUser({
-        email: 'duplicate@example.com',
-        password: 'password123',
-        firstName: 'Test',
-        lastName: 'User'
-      })).rejects.toThrow('User already exists');
+    it('should provide callback authentication methods', () => {
+      const googleCallback = oauthService.authenticateCallback('google');
+      const githubCallback = oauthService.authenticateCallback('github');
+      
+      expect(googleCallback).toBeDefined();
+      expect(githubCallback).toBeDefined();
     });
   });
 
-  describe('User Login', () => {
-    it('should login successfully with valid credentials', async () => {
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ 
-          rows: [{ 
-            id: 'login-user-id', 
-            email: 'login@example.com',
-            password_hash: 'mock-hashed-password',
-            first_name: 'Login',
-            last_name: 'User'
-          }] 
-        });
-
-      mockDb.query = mockQuery;
-
-      const result = await authService.loginUser({
-        email: 'login@example.com',
-        password: 'password123'
-      });
-
-      expect(result).toHaveProperty('token');
-      expect(result).toHaveProperty('user');
-      expect(result.user).toHaveProperty('email', 'login@example.com');
+  describe('MFA Service', () => {
+    it('should generate TOTP secret successfully', async () => {
+      const result = await mfaService.generateTOTPSecret('user-1', 'test@example.com');
+      
+      expect(result).toHaveProperty('secret');
+      expect(result).toHaveProperty('qrCode');
+      expect(result).toHaveProperty('backupCodes');
+      expect(result.backupCodes).toHaveLength(10);
+      expect(result.secret).toBe('mock-secret-base32');
     });
 
-    it('should throw error for non-existent user', async () => {
-      const mockQuery = jest.fn()
-        .mockResolvedValueOnce({ rows: [] });
-
-      mockDb.query = mockQuery;
-
-      await expect(authService.loginUser({
-        email: 'nonexistent@example.com',
-        password: 'password123'
-      })).rejects.toThrow('User not found');
-    });
-  });
-
-  describe('JWT Token Management', () => {
-    it('should generate JWT token', async () => {
-      const token = await authService.generateToken('user-id');
-      expect(token).toBeDefined();
-      expect(typeof token).toBe('string');
-    });
-
-    it('should verify JWT token', async () => {
-      const payload = await authService.verifyToken('mock-jwt-token');
-      expect(payload).toHaveProperty('userId');
-    });
-  });
-
-  describe('Password Management', () => {
-    it('should hash password', async () => {
-      const hashedPassword = await authService.hashPassword('password123');
-      expect(hashedPassword).toBeDefined();
-      expect(hashedPassword).not.toBe('password123');
-    });
-
-    it('should verify password', async () => {
-      const isValid = await authService.verifyPassword('password123', 'mock-hashed-password');
+    it('should verify TOTP token', () => {
+      const isValid = mfaService.verifyTOTPToken('mock-secret', '123456');
       expect(isValid).toBe(true);
+    });
+
+    it('should verify backup code', async () => {
+      // Mock database response
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({
+          rows: [{
+            backup_codes: ['backup-code-1', 'backup-code-2']
+          }]
+        })
+        .mockResolvedValueOnce({ rowCount: 1 }); // Update query
+
+      mockDb.query = mockQuery;
+
+      const isValid = await mfaService.verifyBackupCode('user-1', 'backup-code-1');
+      expect(isValid).toBe(true);
+    });
+
+    it('should store MFA setup', async () => {
+      const mockQuery = jest.fn().mockResolvedValue({ rowCount: 1 });
+      mockDb.query = mockQuery;
+
+      await mfaService.storeMFASetup('user-1', 'mock-secret', ['backup-1', 'backup-2']);
+      
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO mfa_setup'),
+        ['user-1', 'mock-secret', ['backup-1', 'backup-2']]
+      );
+    });
+
+    it('should check if MFA is enabled', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({
+          rows: [{ is_enabled: true }]
+        });
+
+      mockDb.query = mockQuery;
+
+      const isEnabled = await mfaService.isMFAEnabled('user-1');
+      expect(isEnabled).toBe(true);
+    });
+
+    it('should disable MFA', async () => {
+      const mockQuery = jest.fn().mockResolvedValue({ rowCount: 1 });
+      mockDb.query = mockQuery;
+
+      await mfaService.disableMFA('user-1');
+      
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE mfa_setup SET is_enabled = false'),
+        ['user-1']
+      );
+    });
+
+    it('should generate SMS token', () => {
+      const token = mfaService.generateSMSToken();
+      expect(token).toMatch(/^\d{6}$/);
+    });
+
+    it('should store SMS token', async () => {
+      const mockQuery = jest.fn().mockResolvedValue({ rowCount: 1 });
+      mockDb.query = mockQuery;
+
+      await mfaService.storeSMSToken('user-1', '123456');
+      
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO mfa_tokens'),
+        ['user-1', '123456', 'sms', expect.any(Date)]
+      );
+    });
+
+    it('should verify SMS token', async () => {
+      const mockQuery = jest.fn()
+        .mockResolvedValueOnce({
+          rows: [{ id: 'token-1' }]
+        })
+        .mockResolvedValueOnce({ rowCount: 1 });
+
+      mockDb.query = mockQuery;
+
+      const isValid = await mfaService.verifySMSToken('user-1', '123456');
+      expect(isValid).toBe(true);
+    });
+  });
+
+  describe('Service Integration', () => {
+    it('should work together for MFA setup flow', async () => {
+      // 1. Generate TOTP secret
+      const mfaSecret = await mfaService.generateTOTPSecret('user-1', 'test@example.com');
+      expect(mfaSecret.secret).toBeDefined();
+      expect(mfaSecret.backupCodes).toHaveLength(10);
+
+      // 2. Store MFA setup
+      const mockQuery = jest.fn().mockResolvedValue({ rowCount: 1 });
+      mockDb.query = mockQuery;
+
+      await mfaService.storeMFASetup('user-1', mfaSecret.secret, mfaSecret.backupCodes);
+      expect(mockDb.query).toHaveBeenCalled();
+
+      // 3. Verify TOTP token
+      const isValidToken = mfaService.verifyTOTPToken(mfaSecret.secret, '123456');
+      expect(isValidToken).toBe(true);
+
+      // 4. Verify backup code
+      const mockBackupQuery = jest.fn()
+        .mockResolvedValueOnce({
+          rows: [{ backup_codes: mfaSecret.backupCodes }]
+        })
+        .mockResolvedValueOnce({ rowCount: 1 });
+
+      mockDb.query = mockBackupQuery;
+
+      const isValidBackup = await mfaService.verifyBackupCode('user-1', mfaSecret.backupCodes[0]);
+      expect(isValidBackup).toBe(true);
     });
   });
 });

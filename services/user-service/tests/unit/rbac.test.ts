@@ -281,12 +281,24 @@ describe('RBAC Service', () => {
           created_at: new Date()
         }
       ];
+      const mockHierarchyRoles = [
+        {
+          id: 'role-1',
+          name: 'admin',
+          description: 'Administrator role',
+          parent_role_id: null,
+          level: 0,
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+      ];
 
-      // Mock getRoleById
+      // Mock all 4 database calls in order:
       (mockPool.query as jest.Mock)
-        .mockResolvedValueOnce({ rows: [mockRole] }) // getRoleById
-        .mockResolvedValueOnce({ rows: mockPermissions }) // direct permissions
-        .mockResolvedValueOnce({ rows: [] }); // inherited permissions
+        .mockResolvedValueOnce({ rows: [mockRole] }) // 1. getRoleById
+        .mockResolvedValueOnce({ rows: mockPermissions }) // 2. direct permissions
+        .mockResolvedValueOnce({ rows: mockHierarchyRoles }) // 3. getRoleHierarchy
+        .mockResolvedValueOnce({ rows: [] }); // 4. inherited permissions
 
       const result = await rbacService.getRoleWithPermissions('role-1');
 

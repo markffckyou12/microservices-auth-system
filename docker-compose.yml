@@ -13,16 +13,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./services/auth-service/db/migrations:/docker-entrypoint-initdb.d
+      - ./services/user-service/migrations:/docker-entrypoint-initdb.d
     networks:
       - auth-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_system"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Redis for Session Management
+  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: auth-redis
@@ -32,17 +27,13 @@ services:
       - redis_data:/data
     networks:
       - auth-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Auth Service
   auth-service:
     build:
       context: .
-      dockerfile: services/auth-service/Dockerfile
+      dockerfile: Dockerfile
+      target: development
     container_name: auth-service
     environment:
       NODE_ENV: development
@@ -50,65 +41,88 @@ services:
       DATABASE_URL: postgresql://auth_user:auth_password@postgres:5432/auth_system
       REDIS_URL: redis://redis:6379
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      JWT_EXPIRES_IN: 24h
+      OAUTH_GOOGLE_CLIENT_ID: your-google-client-id
+      OAUTH_GOOGLE_CLIENT_SECRET: your-google-client-secret
+      OAUTH_GITHUB_CLIENT_ID: your-github-client-id
+      OAUTH_GITHUB_CLIENT_SECRET: your-github-client-secret
     ports:
       - "3001:3001"
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     networks:
       - auth-network
     volumes:
-      - ./services/auth-service:/app
-      - /app/node_modules
-
-  # Session Service
-  session-service:
-    build:
-      context: .
-      dockerfile: services/session-service/Dockerfile
-    container_name: session-service
-    environment:
-      NODE_ENV: development
-      PORT: 3002
-      REDIS_URL: redis://redis:6379
-      SESSION_SECRET: your-super-secret-session-key-change-in-production
-    ports:
-      - "3002:3002"
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - auth-network
-    volumes:
-      - ./services/session-service:/app
-      - /app/node_modules
+      - ./services/auth-service:/app/services/auth-service
+      - /app/services/auth-service/node_modules
 
   # User Service
   user-service:
     build:
       context: .
-      dockerfile: services/user-service/Dockerfile
+      dockerfile: Dockerfile
+      target: development
     container_name: user-service
     environment:
       NODE_ENV: development
       PORT: 3003
       DATABASE_URL: postgresql://auth_user:auth_password@postgres:5432/auth_system
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
     ports:
       - "3003:3003"
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     networks:
       - auth-network
     volumes:
-      - ./services/user-service:/app
-      - /app/node_modules
+      - ./services/user-service:/app/services/user-service
+      - /app/services/user-service/node_modules
+
+  # Session Service
+  session-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: session-service
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+    ports:
+      - "3002:3002"
+    depends_on:
+      - redis
+    networks:
+      - auth-network
+    volumes:
+      - ./services/session-service:/app/services/session-service
+      - /app/services/session-service/node_modules
+
+  # API Gateway (Optional - for production)
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: api-gateway
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3003
+      SESSION_SERVICE_URL: http://session-service:3002
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+      - user-service
+      - session-service
+    networks:
+      - auth-network
 
 volumes:
   postgres_data:

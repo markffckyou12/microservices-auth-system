@@ -19,7 +19,7 @@ export function setupRBACRoutes(rbacService: RBACService) {
   // Create a new role
   router.post('/roles', validateRequest, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { name, description, permissions } = req.body;
+      const { name, description, parent_role_id } = req.body;
       
       if (!name) {
         return res.status(400).json({
@@ -31,7 +31,7 @@ export function setupRBACRoutes(rbacService: RBACService) {
       const role = await rbacService.createRole({
         name,
         description,
-        permissions: permissions || []
+        parent_role_id
       });
 
       return res.status(201).json({
@@ -91,16 +91,61 @@ export function setupRBACRoutes(rbacService: RBACService) {
     }
   });
 
+  // Get role with permissions (including inherited)
+  router.get('/roles/:id/permissions', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const roleWithPermissions = await rbacService.getRoleWithPermissions(id);
+      
+      if (!roleWithPermissions) {
+        return res.status(404).json({
+          success: false,
+          message: 'Role not found'
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: roleWithPermissions
+      });
+    } catch (error) {
+      console.error('Error fetching role permissions:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch role permissions'
+      });
+    }
+  });
+
+  // Get role hierarchy
+  router.get('/roles/:id/hierarchy', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const hierarchy = await rbacService.getRoleHierarchy(id);
+      
+      return res.json({
+        success: true,
+        data: hierarchy
+      });
+    } catch (error) {
+      console.error('Error fetching role hierarchy:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch role hierarchy'
+      });
+    }
+  });
+
   // Update role
   router.put('/roles/:id', validateRequest, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
-      const { name, description, permissions } = req.body;
+      const { name, description, parent_role_id } = req.body;
       
       const role = await rbacService.updateRole(id, {
         name,
         description,
-        permissions: permissions || []
+        parent_role_id
       });
 
       if (!role) {
@@ -199,14 +244,92 @@ export function setupRBACRoutes(rbacService: RBACService) {
     }
   });
 
+  // Get permission by ID
+  router.get('/permissions/:id', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const permission = await rbacService.getPermission(id);
+      
+      if (!permission) {
+        return res.status(404).json({
+          success: false,
+          message: 'Permission not found'
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: permission
+      });
+    } catch (error) {
+      console.error('Error fetching permission:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch permission'
+      });
+    }
+  });
+
+  // Add permission to role
+  router.post('/roles/:roleId/permissions/:permissionId', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { roleId, permissionId } = req.params;
+      const success = await rbacService.addPermissionToRole(roleId, permissionId);
+      
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          message: 'Failed to add permission to role'
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Permission added to role successfully'
+      });
+    } catch (error) {
+      console.error('Error adding permission to role:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to add permission to role'
+      });
+    }
+  });
+
+  // Remove permission from role
+  router.delete('/roles/:roleId/permissions/:permissionId', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { roleId, permissionId } = req.params;
+      const success = await rbacService.removePermissionFromRole(roleId, permissionId);
+      
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          message: 'Failed to remove permission from role'
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Permission removed from role successfully'
+      });
+    } catch (error) {
+      console.error('Error removing permission from role:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to remove permission from role'
+      });
+    }
+  });
+
   // Assign role to user
   router.post('/users/:userId/roles/:roleId', async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { userId, roleId } = req.params;
-      const assignedBy = req.user?.id || 'system';
+      const assignedBy = req.user?.id;
       
       const userRole = await rbacService.assignRoleToUser(userId, roleId, assignedBy);
-      
+
       return res.status(201).json({
         success: true,
         data: userRole
@@ -239,16 +362,35 @@ export function setupRBACRoutes(rbacService: RBACService) {
     }
   });
 
+  // Get user permissions (including inherited)
+  router.get('/users/:userId/permissions', async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const permissions = await rbacService.getUserPermissions(userId);
+      
+      return res.json({
+        success: true,
+        data: permissions
+      });
+    } catch (error) {
+      console.error('Error fetching user permissions:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch user permissions'
+      });
+    }
+  });
+
   // Remove role from user
   router.delete('/users/:userId/roles/:roleId', async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { userId, roleId } = req.params;
-      const removed = await rbacService.removeRoleFromUser(userId, roleId);
+      const success = await rbacService.removeRoleFromUser(userId, roleId);
       
-      if (!removed) {
+      if (!success) {
         return res.status(404).json({
           success: false,
-          message: 'User role assignment not found'
+          message: 'User role not found'
         });
       }
 

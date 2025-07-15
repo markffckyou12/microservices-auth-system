@@ -35,6 +35,7 @@ services:
       dockerfile: Dockerfile
       target: development
     container_name: auth-service
+    command: ["npm", "run", "dev:auth"]
     environment:
       NODE_ENV: development
       PORT: 3001
@@ -63,6 +64,7 @@ services:
       dockerfile: Dockerfile
       target: development
     container_name: user-service
+    command: ["npm", "run", "dev:user"]
     environment:
       NODE_ENV: development
       PORT: 3003
@@ -87,6 +89,7 @@ services:
       dockerfile: Dockerfile
       target: development
     container_name: session-service
+    command: ["npm", "run", "dev:session"]
     environment:
       NODE_ENV: development
       PORT: 3002
@@ -109,6 +112,7 @@ services:
       dockerfile: Dockerfile
       target: development
     container_name: api-gateway
+    command: ["npm", "run", "dev:gateway"]
     environment:
       NODE_ENV: development
       PORT: 3000

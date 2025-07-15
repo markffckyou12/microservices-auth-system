@@ -23,52 +23,6 @@ function createSessionRoutes(redis) {
             return res.status(500).json({ success: false, message: 'Internal server error' });
         }
     }));
-    router.delete('/:sessionId', (async (req, res) => {
-        try {
-            const { sessionId } = req.params;
-            const userId = req.user?.id;
-            if (!userId) {
-                return res.status(401).json({ success: false, message: 'Unauthorized' });
-            }
-            await sessionService.invalidateSession(sessionId);
-            return res.json({ success: true, message: 'Session invalidated' });
-        }
-        catch (error) {
-            console.error('Error invalidating session:', error);
-            return res.status(500).json({ success: false, message: 'Internal server error' });
-        }
-    }));
-    router.delete('/', (async (req, res) => {
-        try {
-            const userId = req.user?.id;
-            const currentSessionId = req.user?.sessionId;
-            if (!userId) {
-                return res.status(401).json({ success: false, message: 'Unauthorized' });
-            }
-            if (currentSessionId) {
-                await sessionService.invalidateOtherSessions(userId, currentSessionId);
-            }
-            return res.json({ success: true, message: 'Other sessions invalidated' });
-        }
-        catch (error) {
-            console.error('Error invalidating other sessions:', error);
-            return res.status(500).json({ success: false, message: 'Internal server error' });
-        }
-    }));
-    router.delete('/all', (async (req, res) => {
-        try {
-            const userId = req.user?.id;
-            if (!userId) {
-                return res.status(401).json({ success: false, message: 'Unauthorized' });
-            }
-            await sessionService.invalidateAllUserSessions(userId);
-            return res.json({ success: true, message: 'All sessions invalidated' });
-        }
-        catch (error) {
-            console.error('Error invalidating all sessions:', error);
-            return res.status(500).json({ success: false, message: 'Internal server error' });
-        }
-    }));
     router.get('/stats', (async (req, res) => {
         try {
             const userId = req.user?.id;
@@ -95,6 +49,52 @@ function createSessionRoutes(redis) {
         }
         catch (error) {
             console.error('Error refreshing session:', error);
+            return res.status(500).json({ success: false, message: 'Internal server error' });
+        }
+    }));
+    router.delete('/all', (async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            await sessionService.invalidateAllUserSessions(userId);
+            return res.json({ success: true, message: 'All sessions invalidated' });
+        }
+        catch (error) {
+            console.error('Error invalidating all sessions:', error);
+            return res.status(500).json({ success: false, message: 'Internal server error' });
+        }
+    }));
+    router.delete('/', (async (req, res) => {
+        try {
+            const userId = req.user?.id;
+            const currentSessionId = req.user?.sessionId;
+            if (!userId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            if (currentSessionId) {
+                await sessionService.invalidateOtherSessions(userId, currentSessionId);
+            }
+            return res.json({ success: true, message: 'Other sessions invalidated' });
+        }
+        catch (error) {
+            console.error('Error invalidating other sessions:', error);
+            return res.status(500).json({ success: false, message: 'Internal server error' });
+        }
+    }));
+    router.delete('/:sessionId', (async (req, res) => {
+        try {
+            const { sessionId } = req.params;
+            const userId = req.user?.id;
+            if (!userId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            await sessionService.invalidateSession(sessionId);
+            return res.json({ success: true, message: 'Session invalidated' });
+        }
+        catch (error) {
+            console.error('Error invalidating session:', error);
             return res.status(500).json({ success: false, message: 'Internal server error' });
         }
     }));

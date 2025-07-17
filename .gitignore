@@ -8,6 +8,8 @@ yarn-error.log*
 dist/
 build/
 *.tsbuildinfo
+*.js.map
+*.d.ts.map
 
 # Environment variables
 .env
@@ -66,3 +68,4 @@ services/*/node_modules/
 # Temporary files
 *.tmp
 *.temp
+

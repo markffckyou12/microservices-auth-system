@@ -1,0 +1,80 @@
+{
+  "name": "User Management System",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:18",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-eslint",
+        "ms-vscode.vscode-jest",
+        "ms-vscode.vscode-json",
+        "ms-vscode.vscode-yaml",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode.vscode-node-debug2",
+        "ms-vscode.vscode-js-debug",
+        "formulahendry.auto-rename-tag",
+        "christian-kohler.path-intellisense",
+        "ms-vscode.vscode-todo-highlight",
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        "typescript.preferences.includePackageJsonAutoImports": "on",
+        "typescript.suggest.autoImports": true,
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "jest.autoRun": {
+          "watch": false,
+          "onSave": "test-file"
+        }
+      }
+    }
+  },
+  
+  "forwardPorts": [3000, 3001, 3002, 3003, 5432, 6379],
+  
+  "portsAttributes": {
+    "3000": {
+      "label": "Frontend",
+      "onAutoForward": "notify"
+    },
+    "3001": {
+      "label": "Auth Service",
+      "onAutoForward": "notify"
+    },
+    "3002": {
+      "label": "User Service",
+      "onAutoForward": "notify"
+    },
+    "3003": {
+      "label": "Session Service",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "notify"
+    },
+    "6379": {
+      "label": "Redis",
+      "onAutoForward": "notify"
+    }
+  },
+  
+  "postCreateCommand": "npm run setup:devcontainer",
+  
+  "remoteUser": "node",
+  
+  "mounts": [
+    "source=${localWorkspaceFolder}/.devcontainer/data,target=/workspace/data,type=bind"
+  ]
+} 

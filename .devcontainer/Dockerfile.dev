@@ -1,0 +1,47 @@
+FROM mcr.microsoft.com/devcontainers/typescript-node:18
+
+# Install additional tools
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    wget \
+    git \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install global npm packages
+RUN npm install -g \
+    @types/node \
+    typescript \
+    ts-node \
+    nodemon \
+    concurrently \
+    cross-env \
+    rimraf \
+    npm-check-updates
+
+# Set up workspace
+WORKDIR /workspace
+
+# Create necessary directories
+RUN mkdir -p /workspace/.devcontainer/data
+
+# Set environment variables
+ENV NODE_ENV=development
+ENV PATH="/workspace/node_modules/.bin:$PATH"
+
+# Copy package files for faster installation
+COPY package*.json ./
+COPY services/*/package*.json ./services/
+COPY frontend/package*.json ./frontend/
+COPY shared/package*.json ./shared/
+
+# Install dependencies (will be overridden by volume mounts)
+RUN npm install || true
+
+# Set permissions
+RUN chown -R node:node /workspace
+USER node
+
+# Default command
+CMD ["sleep", "infinity"] 

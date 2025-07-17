@@ -1,83 +1,131 @@
-import { useCallback } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { userAPI } from '../utils/api';
-import type { User } from '../types';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '../utils/api';
 
-export const useUsers = () => {
-  const { state, dispatch } = useAppContext();
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  isActive: boolean;
+  roles: string[];
+  createdAt: string;
+  updatedAt: string;
+}
 
-  const fetchUsers = useCallback(async () => {
-    dispatch({ type: 'SET_LOADING', payload: { section: 'user', loading: true } });
-    dispatch({ type: 'SET_ERROR', payload: { section: 'user', error: null } });
+export interface CreateUserData {
+  email: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+  roles?: string[];
+  isActive?: boolean;
+}
 
-    try {
-      const users = await userAPI.getUsers();
-      // For now, we'll just store the current user's roles
-      // In a real app, you might want to store all users
-      return users;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch users';
-      dispatch({ type: 'SET_ERROR', payload: { section: 'user', error: errorMessage } });
-      throw error;
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: { section: 'user', loading: false } });
-    }
-  }, [dispatch]);
+export interface UpdateUserData {
+  email?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  isActive?: boolean;
+}
 
-  const createUser = useCallback(async (userData: Partial<User>) => {
-    dispatch({ type: 'SET_LOADING', payload: { section: 'user', loading: true } });
-    dispatch({ type: 'SET_ERROR', payload: { section: 'user', error: null } });
+export interface UserListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: 'active' | 'inactive' | 'all';
+}
 
-    try {
-      const user = await userAPI.createUser(userData);
-      return { success: true, user };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create user';
-      dispatch({ type: 'SET_ERROR', payload: { section: 'user', error: errorMessage } });
-      return { success: false, error: errorMessage };
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: { section: 'user', loading: false } });
-    }
-  }, [dispatch]);
-
-  const updateUser = useCallback(async (id: string, userData: Partial<User>) => {
-    dispatch({ type: 'SET_LOADING', payload: { section: 'user', loading: true } });
-    dispatch({ type: 'SET_ERROR', payload: { section: 'user', error: null } });
-
-    try {
-      const user = await userAPI.updateUser(id, userData);
-      return { success: true, user };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update user';
-      dispatch({ type: 'SET_ERROR', payload: { section: 'user', error: errorMessage } });
-      return { success: false, error: errorMessage };
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: { section: 'user', loading: false } });
-    }
-  }, [dispatch]);
-
-  const deleteUser = useCallback(async (id: string) => {
-    dispatch({ type: 'SET_LOADING', payload: { section: 'user', loading: true } });
-    dispatch({ type: 'SET_ERROR', payload: { section: 'user', error: null } });
-
-    try {
-      await userAPI.deleteUser(id);
-      return { success: true };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
-      dispatch({ type: 'SET_ERROR', payload: { section: 'user', error: errorMessage } });
-      return { success: false, error: errorMessage };
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: { section: 'user', loading: false } });
-    }
-  }, [dispatch]);
-
-  return {
-    loading: state.user.loading,
-    error: state.user.error,
-    fetchUsers,
-    createUser,
-    updateUser,
-    deleteUser,
+export interface UserListResponse {
+  users: User[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
   };
+}
+
+// Get all users
+export const useUsers = (params: UserListParams = {}) => {
+  return useQuery({
+    queryKey: ['users', params],
+    queryFn: async (): Promise<UserListResponse> => {
+      const searchParams = new URLSearchParams();
+      if (params.page) searchParams.append('page', params.page.toString());
+      if (params.limit) searchParams.append('limit', params.limit.toString());
+      if (params.search) searchParams.append('search', params.search);
+      if (params.status) searchParams.append('status', params.status);
+      
+      const response = await apiClient.get(`/user-management?${searchParams.toString()}`);
+      return response.data.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+// Get user by ID
+export const useUser = (userId: string) => {
+  return useQuery({
+    queryKey: ['user', userId],
+    queryFn: async (): Promise<User> => {
+      const response = await apiClient.get(`/user-management/${userId}`);
+      return response.data.data;
+    },
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+// Create user
+export const useCreateUser = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (userData: CreateUserData): Promise<User> => {
+      const response = await apiClient.post('/user-management', userData);
+      return response.data.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch users list
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+};
+
+// Update user
+export const useUpdateUser = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ userId, userData }: { userId: string; userData: UpdateUserData }): Promise<User> => {
+      const response = await apiClient.put(`/user-management/${userId}`, userData);
+      return response.data.data;
+    },
+    onSuccess: (updatedUser) => {
+      // Update user in cache
+      queryClient.setQueryData(['user', updatedUser.id], updatedUser);
+      // Invalidate users list
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+};
+
+// Delete user
+export const useDeleteUser = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (userId: string): Promise<void> => {
+      await apiClient.delete(`/user-management/${userId}`);
+    },
+    onSuccess: (_, userId) => {
+      // Remove user from cache
+      queryClient.removeQueries({ queryKey: ['user', userId] });
+      // Invalidate users list
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
 }; 

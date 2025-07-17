@@ -75,7 +75,8 @@ services:
       dockerfile: Dockerfile
       target: development
     container_name: user-service
-    command: ["npm", "run", "dev:user"]
+    command: ["npm", "run", "dev"]
+    working_dir: /app/services/user-service
     environment:
       NODE_ENV: development
       PORT: 3003

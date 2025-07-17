@@ -1,71 +1,187 @@
-# Dependencies
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Build outputs
+# =============================================================================
+# BUILD OUTPUTS
+# =============================================================================
 dist/
 build/
 *.tsbuildinfo
 *.js.map
 *.d.ts.map
+.next/
+.nuxt/
+.vuepress/dist
+.serverless/
+.fusebox/
+.dynamodb/
 
-# Environment variables
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.staging.local
 
-# IDE files
+# =============================================================================
+# IDE FILES
+# =============================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# OS files
+# =============================================================================
+# OS FILES
+# =============================================================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Logs
+# =============================================================================
+# LOGS
+# =============================================================================
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Runtime data
+# =============================================================================
+# RUNTIME DATA
+# =============================================================================
 pids/
 *.pid
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# =============================================================================
+# COVERAGE REPORTS
+# =============================================================================
 coverage/
 *.lcov
-
-# nyc test coverage
 .nyc_output
+coverage.json
+*.coverage
+*.coverage.*
 
-# Dependency directories
-jspm_packages/
+# =============================================================================
+# TEST OUTPUTS
+# =============================================================================
+test-results/
+playwright-report/
+playwright/.cache/
+test-results.xml
+junit.xml
 
-# Optional npm cache directory
+# =============================================================================
+# CACHE DIRECTORIES
+# =============================================================================
 .npm
-
-# Optional eslint cache
 .eslintcache
+.stylelintcache
+.parcel-cache
+.cache
+.rollup.cache
 
-# Microservices specific
+# =============================================================================
+# MICROSERVICES SPECIFIC
+# =============================================================================
 services/*/dist/
 services/*/build/
 services/*/node_modules/
+services/*/coverage/
+services/*/logs/
+services/*/.env
 
-# Memory bank (optional - you might want to exclude this)
-# memory-bank/
+# =============================================================================
+# FRONTEND SPECIFIC
+# =============================================================================
+frontend/dist/
+frontend/build/
+frontend/node_modules/
+frontend/coverage/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
 
-# Docker
+# =============================================================================
+# SHARED SPECIFIC
+# =============================================================================
+shared/dist/
+shared/build/
+shared/node_modules/
+shared/coverage/
+
+# =============================================================================
+# DOCKER
+# =============================================================================
 .dockerignore
+docker-compose.override.yml
 
-# Temporary files
+# =============================================================================
+# TEMPORARY FILES
+# =============================================================================
 *.tmp
 *.temp
+*.bak
+*.backup
+*.orig
+*.rej
+
+# =============================================================================
+# UPLOADS
+# =============================================================================
+uploads/
+public/uploads/
+
+# =============================================================================
+# MEMORY BANK (OPTIONAL - UNCOMMENT TO EXCLUDE)
+# =============================================================================
+# memory-bank/
+
+# =============================================================================
+# PRODUCTION FILES
+# =============================================================================
+*.tar.gz
+*.zip
+deploy/
+production/
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+.secrets
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+metrics/
+prometheus/
+grafana/
 

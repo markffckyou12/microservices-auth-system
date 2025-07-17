@@ -1,0 +1,4 @@
+ALTER TABLE users
+  ADD COLUMN username VARCHAR(30) UNIQUE,
+  ADD COLUMN first_name VARCHAR(50),
+  ADD COLUMN last_name VARCHAR(50); 

@@ -96,6 +96,52 @@ export default function createPasswordRouter(passwordService: PasswordService): 
     }
   });
 
+  // Reset password confirm (alias for /reset)
+  router.post('/reset-confirm', [
+    body('token').notEmpty().withMessage('Token is required'),
+    body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+  ], async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token) {
+        res.status(400).json({
+          success: false,
+          error: 'Token is required'
+        });
+        return;
+      }
+
+      if (!newPassword) {
+        res.status(400).json({
+          success: false,
+          error: 'New password is required'
+        });
+        return;
+      }
+
+      const result = await passwordService.resetPassword(token, newPassword);
+      
+      if (result) {
+        res.json({
+          success: true,
+          message: 'Password reset successfully'
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid or expired token'
+        });
+      }
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to reset password'
+      });
+    }
+  });
+
   // Change password (requires authentication)
   router.post('/change', [
     body('currentPassword').notEmpty().withMessage('Current password is required'),

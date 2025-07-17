@@ -31,7 +31,7 @@ app.use(limiter);
 const speedLimiter = slowDown({
   windowMs: 15 * 60 * 1000, // 15 minutes
   delayAfter: 50, // allow 50 requests per 15 minutes without slowing down
-  delayMs: 500 // add 500ms delay per request after delayAfter
+  delayMs: () => 500 // add 500ms delay per request after delayAfter
 });
 app.use(speedLimiter);
 
@@ -44,7 +44,7 @@ const redis = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379'
 });
 
-redis.on('error', (err) => {
+redis.on('error', (err: any) => {
   console.error('Redis Client Error:', err);
 });
 

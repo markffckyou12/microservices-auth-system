@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { RBACService } from '../services/rbac';
 import { AuditService } from '../services/audit';
+import { verifyJwt } from '../utils/auth';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -272,5 +273,41 @@ export class AuthorizationMiddleware {
       // Don't let audit logging errors break the authorization flow
       console.error('Failed to log security event:', error);
     }
+  }
+}
+
+export function authenticateJwt(req: Request, res: Response, next: NextFunction) {
+  console.log('🔐 authenticateJwt: Starting JWT authentication');
+  
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  console.log('🔐 authenticateJwt: Auth header:', authHeader ? 'present' : 'missing');
+  
+  if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    console.log('🔐 authenticateJwt: Invalid auth header format');
+    res.status(401).json({ success: false, message: 'Missing or invalid Authorization header' });
+    return;
+  }
+  
+  const token = authHeader.replace('Bearer ', '').trim();
+  console.log('🔐 authenticateJwt: Token extracted, length:', token.length);
+  
+  try {
+    console.log('🔐 authenticateJwt: Verifying JWT...');
+    const decoded = verifyJwt(token);
+    console.log('🔐 authenticateJwt: JWT verified, decoded:', { userId: decoded.userId, email: decoded.email });
+    
+    (req as any).user = {
+      id: decoded.userId,
+      email: decoded.email,
+      roles: decoded.roles || (decoded.role ? [decoded.role] : undefined)
+    };
+    console.log('🔐 authenticateJwt: req.user set successfully');
+    
+    next();
+    return;
+  } catch (err) {
+    console.error('🔐 authenticateJwt: JWT verification failed:', err);
+    res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    return;
   }
 } 

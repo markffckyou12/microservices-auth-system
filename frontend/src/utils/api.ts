@@ -2,6 +2,9 @@ import axios from 'axios';
 import type { AxiosInstance, AxiosResponse } from 'axios';
 import type { AuthResponse, LoginCredentials, User, Role, AuditLog, AuditFilters } from '../types';
 
+// Add this at the top of the file to debug
+console.log('API Base URL:', (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001/api/v1');
+
 // API client configuration
 const apiClient: AxiosInstance = axios.create({
   baseURL: (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001/api/v1',

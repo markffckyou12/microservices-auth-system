@@ -1,6 +1,29 @@
 import { Express } from 'express';
 import { RedisClientType } from 'redis';
 import createSessionRoutes from './session';
+import jwt from 'jsonwebtoken';
+
+// JWT Authentication Middleware
+const authenticateJwt = (req: any, res: any, next: any) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production') as any;
+    
+    if (!decoded || !decoded.userId) {
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+
+    req.user = { id: decoded.userId };
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
 
 export const setupRoutes = (app: Express, redis: RedisClientType) => {
   // Health check route
@@ -20,6 +43,6 @@ export const setupRoutes = (app: Express, redis: RedisClientType) => {
     });
   });
 
-  // Session Management Routes
-  app.use('/api/v1/sessions', createSessionRoutes(redis));
+  // Session Management Routes with JWT authentication
+  app.use('/api/v1/sessions', authenticateJwt, createSessionRoutes(redis));
 }; 

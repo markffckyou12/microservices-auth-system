@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
+import path from 'path';
 import { createLogger } from './config/logger';
 import { setupDatabase, getDatabase } from './config/database';
 import { setupRedis, getRedis } from './config/redis';
@@ -11,12 +12,12 @@ import { setupRoutes } from './routes';
 import { setupErrorHandling } from './middleware/errorHandler';
 import { HEALTH_CHECK } from '@auth-system/shared';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from the root directory
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 const logger = createLogger();
-const port = process.env.PORT || 3001;
+const port = process.env.AUTH_SERVICE_PORT || process.env.PORT || 3001;
 
 // Initialize services
 async function initializeServices() {

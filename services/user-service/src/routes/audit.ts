@@ -51,6 +51,126 @@ export function createAuditRouter(auditService: AuditService): Router {
     next();
   };
 
+  // Add missing routes that were returning "Route not found" - these must come BEFORE /logs
+  
+  // Get audit logs by user ID
+  router.get('/logs/user/:userId', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { userId } = req.params;
+      
+      const filters: AuditFilters = {
+        userId: userId
+      };
+
+      const logs = await auditService.getAuditLogs(filters);
+      
+      res.json({
+        success: true,
+        data: logs,
+        count: logs.length
+      });
+    } catch (error) {
+      console.error('Error fetching user audit logs:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch user audit logs'
+      });
+    }
+  });
+
+  // Get audit logs by action
+  router.get('/logs/action/:action', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { action } = req.params;
+      
+      const filters: AuditFilters = {
+        action: action
+      };
+
+      const logs = await auditService.getAuditLogs(filters);
+      
+      res.json({
+        success: true,
+        data: logs,
+        count: logs.length
+      });
+    } catch (error) {
+      console.error('Error fetching action audit logs:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch action audit logs'
+      });
+    }
+  });
+
+  // Get audit logs by resource
+  router.get('/logs/resource/:resource', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { resource } = req.params;
+      
+      const filters: AuditFilters = {
+        resourceType: resource
+      };
+
+      const logs = await auditService.getAuditLogs(filters);
+      
+      res.json({
+        success: true,
+        data: logs,
+        count: logs.length
+      });
+    } catch (error) {
+      console.error('Error fetching resource audit logs:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch resource audit logs'
+      });
+    }
+  });
+
+  // Get audit logs by date range
+  router.get('/logs/date-range', validateRequest, async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { start_date, end_date, user_id, action, resource_type, limit, offset } = req.query;
+      
+      if (!start_date || !end_date) {
+        res.status(400).json({
+          success: false,
+          error: 'start_date and end_date are required'
+        });
+        return;
+      }
+      
+      const filters: AuditFilters = {
+        userId: user_id as string,
+        action: action as string,
+        resourceType: resource_type as string,
+        startDate: new Date(start_date as string),
+        endDate: new Date(end_date as string),
+        limit: limit ? parseInt(limit as string) : undefined,
+        offset: offset ? parseInt(offset as string) : undefined
+      };
+
+      const logs = await auditService.getAuditLogs(filters);
+      
+      res.json({
+        success: true,
+        data: logs,
+        count: logs.length,
+        dateRange: {
+          start: start_date,
+          end: end_date
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching date range audit logs:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch date range audit logs'
+      });
+    }
+  });
+
   // Get audit logs with filters
   router.get('/logs', validateRequest, async (req: Request, res: Response): Promise<void> => {
     try {
@@ -254,6 +374,8 @@ export function createAuditRouter(auditService: AuditService): Router {
       });
     }
   });
+
+
 
   return router;
 } 

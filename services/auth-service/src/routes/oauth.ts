@@ -3,21 +3,70 @@ import OAuthService from '../services/oauth';
 import { Pool } from 'pg';
 
 const router = Router();
-const oauthService = OAuthService.getInstance();
 
 export default function createOAuthRoutes(db: Pool) {
+  const oauthService = OAuthService.getInstance();
+  // Force OAuth service initialization
+  console.log('🔄 Creating OAuth routes, initializing OAuth service...');
+  console.log('✅ OAuth service initialized');
+
+  // Debug endpoint to check OAuth service status
+  router.get('/debug', (req: Request, res: Response) => {
+    const status = oauthService.getStrategiesStatus();
+    console.log('🔍 OAuth debug endpoint called, strategies status:', status);
+    res.json({
+      success: true,
+      data: {
+        strategies: status,
+        environment: {
+          googleClientId: !!process.env.GOOGLE_CLIENT_ID,
+          googleClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+          githubClientId: !!process.env.GITHUB_CLIENT_ID,
+          githubClientSecret: !!process.env.GITHUB_CLIENT_SECRET,
+          nodeEnv: process.env.NODE_ENV
+        }
+      }
+    });
+  });
+
   /**
    * @route GET /auth/google
    * @desc Initiate Google OAuth login
    */
-  router.get('/google', oauthService.authenticate('google'));
+  router.get('/google', (req: Request, res: Response, next: any) => {
+    try {
+      console.log('🔐 Initiating Google OAuth flow...');
+      const authMiddleware = oauthService.authenticate('google');
+      authMiddleware(req, res, next);
+    } catch (error) {
+      console.error('❌ Google OAuth initiation error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'OAuth service not properly initialized',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
 
   /**
    * @route GET /auth/google/callback
    * @desc Handle Google OAuth callback
    */
   router.get('/google/callback', 
-    oauthService.authenticateCallback('google'),
+    (req: Request, res: Response, next: any) => {
+      try {
+        console.log('🔐 Processing Google OAuth callback...');
+        const authMiddleware = oauthService.authenticateCallback('google');
+        authMiddleware(req, res, next);
+      } catch (error) {
+        console.error('❌ Google OAuth callback error:', error);
+        res.status(500).json({
+          success: false,
+          message: 'OAuth service not properly initialized',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    },
     async (req: Request, res: Response) => {
       try {
         const user = req.user as any;
@@ -96,14 +145,40 @@ export default function createOAuthRoutes(db: Pool) {
    * @route GET /auth/github
    * @desc Initiate GitHub OAuth login
    */
-  router.get('/github', oauthService.authenticate('github'));
+  router.get('/github', (req: Request, res: Response, next: any) => {
+    try {
+      console.log('🔐 Initiating GitHub OAuth flow...');
+      const authMiddleware = oauthService.authenticate('github');
+      authMiddleware(req, res, next);
+    } catch (error) {
+      console.error('❌ GitHub OAuth initiation error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'OAuth service not properly initialized',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
 
   /**
    * @route GET /auth/github/callback
    * @desc Handle GitHub OAuth callback
    */
   router.get('/github/callback',
-    oauthService.authenticateCallback('github'),
+    (req: Request, res: Response, next: any) => {
+      try {
+        console.log('🔐 Processing GitHub OAuth callback...');
+        const authMiddleware = oauthService.authenticateCallback('github');
+        authMiddleware(req, res, next);
+      } catch (error) {
+        console.error('❌ GitHub OAuth callback error:', error);
+        res.status(500).json({
+          success: false,
+          message: 'OAuth service not properly initialized',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    },
     async (req: Request, res: Response) => {
       try {
         const user = req.user as any;

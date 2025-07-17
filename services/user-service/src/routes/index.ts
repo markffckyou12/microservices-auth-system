@@ -7,6 +7,7 @@ import createPasswordRouter from './password';
 import { RBACService } from '../services/rbac';
 import { AuditServiceImpl } from '../services/audit';
 import { PasswordServiceImpl } from '../services/password';
+import { authenticateJwt } from '../middleware/authorization';
 
 export function setupRoutes(db: Pool): Router {
   const router = Router();
@@ -18,7 +19,7 @@ export function setupRoutes(db: Pool): Router {
 
   // Setup routes
   const userRouter = setupUserRoutes(db);
-  router.use('/users', userRouter);
+  router.use('/users', authenticateJwt, userRouter);
   router.use('/rbac', createRBACRouter(rbacService));
   router.use('/audit', createAuditRouter(auditService));
   router.use('/password', createPasswordRouter(passwordService));

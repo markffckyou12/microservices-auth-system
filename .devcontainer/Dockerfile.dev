@@ -39,8 +39,15 @@ COPY shared/package*.json ./shared/
 # Install dependencies (will be overridden by volume mounts)
 RUN npm install || true
 
-# Set permissions
-RUN chown -R node:node /workspace
+# Set permissions and create directories
+RUN chown -R node:node /workspace && \
+    mkdir -p /workspace/services/auth-service/node_modules && \
+    mkdir -p /workspace/services/user-service/node_modules && \
+    mkdir -p /workspace/services/session-service/node_modules && \
+    mkdir -p /workspace/frontend/node_modules && \
+    mkdir -p /workspace/shared/node_modules && \
+    chown -R node:node /workspace
+
 USER node
 
 # Default command

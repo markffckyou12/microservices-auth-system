@@ -101,10 +101,10 @@ jest.mock('qrcode', () => ({
 
 // Mock passport
 jest.mock('passport', () => ({
-  authenticate: jest.fn(() => (req: any, res: any, next: any) => next()),
+  authenticate: jest.fn(() => function(req, res, next) { return next(); }),
   use: jest.fn(),
-  initialize: jest.fn(() => (req: any, res: any, next: any) => next()),
-  session: jest.fn(() => (req: any, res: any, next: any) => next())
+  initialize: jest.fn(() => function(req, res, next) { return next(); }),
+  session: jest.fn(() => function(req, res, next) { return next(); })
 }));
 
 // Mock passport strategies
@@ -141,17 +141,17 @@ jest.mock('winston', () => ({
 }));
 
 // Mock express middleware
-jest.mock('express-rate-limit', () => jest.fn(() => (req: any, res: any, next: any) => next()));
-jest.mock('express-slow-down', () => jest.fn(() => (req: any, res: any, next: any) => next()));
-jest.mock('helmet', () => jest.fn(() => (req: any, res: any, next: any) => next()));
-jest.mock('cors', () => jest.fn(() => (req: any, res: any, next: any) => next()));
-jest.mock('compression', () => jest.fn(() => (req: any, res: any, next: any) => next()));
+jest.mock('express-rate-limit', () => jest.fn(() => function(req, res, next) { return next(); }));
+jest.mock('express-slow-down', () => jest.fn(() => function(req, res, next) { return next(); }));
+jest.mock('helmet', () => jest.fn(() => function(req, res, next) { return next(); }));
+jest.mock('cors', () => jest.fn(() => function(req, res, next) { return next(); }));
+jest.mock('compression', () => jest.fn(() => function(req, res, next) { return next(); }));
 
 // Mock express-validator
 jest.mock('express-validator', () => ({
-  body: jest.fn(() => (req: any, res: any, next: any) => next()),
-  param: jest.fn(() => (req: any, res: any, next: any) => next()),
-  query: jest.fn(() => (req: any, res: any, next: any) => next()),
+  body: jest.fn(() => function(req, res, next) { return next(); }),
+  param: jest.fn(() => function(req, res, next) { return next(); }),
+  query: jest.fn(() => function(req, res, next) { return next(); }),
   validationResult: jest.fn(() => ({
     isEmpty: () => true,
     array: () => []

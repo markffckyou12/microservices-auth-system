@@ -49,6 +49,17 @@ print_status "Checking npm version..."
 NPM_VERSION=$(npm --version)
 print_success "npm version: $NPM_VERSION"
 
+# Fix permissions if needed
+print_status "Checking and fixing permissions..."
+if [ ! -w "services/auth-service/node_modules" ] 2>/dev/null; then
+    print_warning "Permission issues detected, attempting to fix..."
+    if command -v sudo &> /dev/null; then
+        sudo chown -R node:node /workspaces/microservices-auth-system 2>/dev/null || true
+        sudo mkdir -p services/auth-service/node_modules services/user-service/node_modules services/session-service/node_modules frontend/node_modules shared/node_modules 2>/dev/null || true
+        sudo chown -R node:node services/*/node_modules frontend/node_modules shared/node_modules 2>/dev/null || true
+    fi
+fi
+
 # Install dependencies
 print_status "Installing dependencies..."
 npm run install:all

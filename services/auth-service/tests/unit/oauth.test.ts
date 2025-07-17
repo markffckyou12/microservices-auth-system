@@ -13,8 +13,8 @@ jest.mock('pg', () => ({
 
 jest.mock('../../src/services/oauth', () => ({
   getInstance: jest.fn(() => ({
-    authenticate: jest.fn(() => (req: any, res: any, next: any) => next()),
-    authenticateCallback: jest.fn(() => (req: any, res: any, next: any) => next())
+    authenticate: jest.fn(() => function(req, res, next) { return next(); }),
+    authenticateCallback: jest.fn(() => function(req, res, next) { return next(); })
   }))
 }));
 

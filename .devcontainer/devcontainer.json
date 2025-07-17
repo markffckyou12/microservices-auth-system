@@ -8,6 +8,12 @@
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   
+  "remoteUser": "node",
+  
+  "mounts": [
+    "source=${localWorkspaceFolder}/.devcontainer/data,target=/workspace/data,type=bind"
+  ],
+  
   "customizations": {
     "vscode": {
       "extensions": [
@@ -72,9 +78,5 @@
   
   "postCreateCommand": "npm run setup:devcontainer",
   
-  "remoteUser": "node",
-  
-  "mounts": [
-    "source=${localWorkspaceFolder}/.devcontainer/data,target=/workspace/data,type=bind"
-  ]
+  "initializeCommand": "mkdir -p ${localWorkspaceFolder}/.devcontainer/data && chown -R 1000:1000 ${localWorkspaceFolder}"
 } 

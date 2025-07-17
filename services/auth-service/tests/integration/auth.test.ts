@@ -22,7 +22,7 @@ jest.mock('pg', () => ({
 
 jest.mock('passport', () => ({
   use: jest.fn(),
-  authenticate: jest.fn(() => (req: any, res: any, next: any) => next())
+  authenticate: jest.fn(() => function(req, res, next) { return next(); })
 }));
 
 jest.mock('passport-google-oauth20', () => ({

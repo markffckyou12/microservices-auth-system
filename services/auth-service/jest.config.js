@@ -7,7 +7,9 @@ module.exports = {
     '**/?(*.)+(spec|test).ts'
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
+    }],
   },
   collectCoverageFrom: [
     'src/**/*.ts',
@@ -23,15 +25,10 @@ module.exports = {
   verbose: true,
   clearMocks: true,
   restoreMocks: true,
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(passport|passport-google-oauth20|passport-github2)/)'
   ],
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.json',
-    },
-  },
 }; 

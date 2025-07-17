@@ -101,10 +101,10 @@ jest.mock('qrcode', () => ({
 
 // Mock passport
 jest.mock('passport', () => ({
-  authenticate: jest.fn(() => function(req, res, next) { return next(); }),
+  authenticate: jest.fn(() => function(req: any, res: any, next: any) { return next(); }),
   use: jest.fn(),
-  initialize: jest.fn(() => function(req, res, next) { return next(); }),
-  session: jest.fn(() => function(req, res, next) { return next(); })
+  initialize: jest.fn(() => function(req: any, res: any, next: any) { return next(); }),
+  session: jest.fn(() => function(req: any, res: any, next: any) { return next(); })
 }));
 
 // Mock passport strategies
@@ -141,17 +141,17 @@ jest.mock('winston', () => ({
 }));
 
 // Mock express middleware
-jest.mock('express-rate-limit', () => jest.fn(() => function(req, res, next) { return next(); }));
-jest.mock('express-slow-down', () => jest.fn(() => function(req, res, next) { return next(); }));
-jest.mock('helmet', () => jest.fn(() => function(req, res, next) { return next(); }));
-jest.mock('cors', () => jest.fn(() => function(req, res, next) { return next(); }));
-jest.mock('compression', () => jest.fn(() => function(req, res, next) { return next(); }));
+jest.mock('express-rate-limit', () => jest.fn(() => function(req: any, res: any, next: any) { return next(); }));
+jest.mock('express-slow-down', () => jest.fn(() => function(req: any, res: any, next: any) { return next(); }));
+jest.mock('helmet', () => jest.fn(() => function(req: any, res: any, next: any) { return next(); }));
+jest.mock('cors', () => jest.fn(() => function(req: any, res: any, next: any) { return next(); }));
+jest.mock('compression', () => jest.fn(() => function(req: any, res: any, next: any) { return next(); }));
 
 // Mock express-validator
 jest.mock('express-validator', () => ({
-  body: jest.fn(() => function(req, res, next) { return next(); }),
-  param: jest.fn(() => function(req, res, next) { return next(); }),
-  query: jest.fn(() => function(req, res, next) { return next(); }),
+  body: jest.fn(() => function(req: any, res: any, next: any) { return next(); }),
+  param: jest.fn(() => function(req: any, res: any, next: any) { return next(); }),
+  query: jest.fn(() => function(req: any, res: any, next: any) { return next(); }),
   validationResult: jest.fn(() => ({
     isEmpty: () => true,
     array: () => []

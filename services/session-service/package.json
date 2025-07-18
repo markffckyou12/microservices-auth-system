@@ -12,6 +12,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@auth-system/shared": "file:../shared",
     "@types/bcrypt": "^5.0.2",
     "@types/redis": "^2.8.32",
     "bcrypt": "^6.0.0",
